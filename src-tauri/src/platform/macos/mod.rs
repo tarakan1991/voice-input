@@ -23,11 +23,16 @@ pub fn create(app: &tauri::AppHandle) -> Result<PlatformServices> {
 }
 
 /// Выполняет замыкание на главном потоке AppKit и синхронно возвращает
-/// результат. Если вызвано с главного потока — выполняется сразу.
+/// результат. С главного потока выполняется инлайн — это важно: в `setup`
+/// событийный цикл ещё не крутится, и ожидание `run_on_main_thread`
+/// заблокировалось бы навсегда.
 pub(crate) fn on_main<T: Send + 'static>(
     app: &tauri::AppHandle,
     f: impl FnOnce() -> T + Send + 'static,
 ) -> Result<T> {
+    if objc2::MainThreadMarker::new().is_some() {
+        return Ok(f());
+    }
     let (tx, rx) = crossbeam_channel::bounded(1);
     app.run_on_main_thread(move || {
         let _ = tx.send(f());

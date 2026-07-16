@@ -1,0 +1,43 @@
+name: Release
+
+# Релиз по тегу v*: сборка .dmg (macOS, Apple Silicon) и публикация
+# артефактов в GitHub Releases. Windows добавится на этапе 2.
+# Формат артефактов совместим с tauri-plugin-updater (задел на будущее).
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    name: macOS (Apple Silicon)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Зависимости фронтенда
+        run: npm ci
+
+      - name: Сборка приложения (.app + .dmg)
+        run: npx tauri build
+
+      - name: Публикация в GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+          generate_release_notes: true

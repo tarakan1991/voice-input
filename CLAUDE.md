@@ -24,27 +24,37 @@
 voice-input/
 ├── SPEC.md                  # спецификация продукта
 ├── CLAUDE.md                # этот файл
+├── PROGRESS.md              # статус этапов + чеклист ручной приёмки
 ├── src/                     # фронтенд (TS + Svelte)
+│   ├── main.ts              # выбор компонента по label окна
+│   ├── App.svelte
+│   ├── lib/                 # ipc.ts (типизированные команды/события), общие виджеты
 │   ├── overlay/             # плашка + окно кнопки отмены
 │   ├── wizard/              # мастер первого запуска
 │   ├── settings/            # настройки (вкл. редактор словаря)
-│   └── history/             # история распознаваний
+│   ├── history/             # история распознаваний
+│   └── main-window/         # роутер главного окна (мастер/настройки/история)
 ├── src-tauri/
 │   ├── tauri.conf.json
+│   ├── Info.plist           # NSMicrophoneUsageDescription, LSUIElement
+│   ├── capabilities/        # права окон (main, overlay, cancel)
+│   ├── icons/               # иконка приложения + icons/tray/ (статусы трея)
+│   ├── resources/           # вшитый тестовый WAV-сэмпл
 │   └── src/
 │       ├── main.rs
-│       ├── app/             # машина состояний сессии, оркестрация, события в UI
-│       ├── audio/           # конвейер: захват (через трейт), ресемплинг 16кГц, RMS
-│       ├── vad/             # VadEngine + реализация Silero
+│       ├── app/             # сессия (машина состояний), трей, оверлей, команды, события
+│       ├── audio/           # ресемплинг 16кГц, RMS, звуковые отбивки (синтез)
+│       ├── vad/             # VadEngine + Silero, таймер тишины
 │       ├── asr/             # whisper-rs, параметры ru, фильтр галлюцинаций
-│       ├── postproc/        # вычитка: llama.cpp, облако, guardrails, промпты
+│       ├── postproc/        # вычитка: llama.cpp, облако, guardrails, ключи (keyring)
 │       ├── dictionary/      # термины, правила замены, сборка initial_prompt
-│       ├── models/          # манифест, загрузчик, SHA256, тест-прогон
+│       ├── models/          # манифест (SHA256), загрузчик с докачкой, тест-прогон
 │       ├── inject/          # оркестрация вставки: буфер, восстановление, фолбэк
 │       ├── config/          # конфиг + миграции
 │       ├── history/         # SQLite
 │       └── platform/
 │           ├── mod.rs       # трейты, общие типы, фабрика (ЕДИНСТВЕННОЕ место с cfg)
+│           ├── shared/      # реализации на кроссплатформенных библиотеках (cpal, плагины)
 │           ├── macos/       # реальные реализации (этап 1)
 │           └── windows/     # заглушки unimplemented!() (до этапа 2)
 └── .github/workflows/       # ci.yml (push), release.yml (теги v*)
@@ -63,6 +73,12 @@ cargo clippy  --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo fmt     --manifest-path src-tauri/Cargo.toml -- --check
 npm run check              # svelte-check + tsc
 ```
+
+Нюанс `.dmg`: шаг «украшения» образа управляет Finder через AppleScript и
+требует права Automation. В headless-окружении (CI, агенты) сборка падает с
+«Время AppleEvent истекло» — запускайте `CI=true cargo tauri build`: bundler
+передаст `--skip-jenkins`, dmg соберётся без косметики Finder. На живой машине
+достаточно один раз разрешить терминалу управлять Finder.
 
 ## Соглашения
 

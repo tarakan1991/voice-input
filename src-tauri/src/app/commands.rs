@@ -30,12 +30,11 @@ pub fn config_get(state: State<AppState>) -> AppConfig {
 pub fn config_set(app: AppHandle, state: State<AppState>, config: AppConfig) -> CmdResult<()> {
     let old = state.config.get();
     state.config.set(config.clone()).map_err(err_str)?;
-    // Смена хоткея — перерегистрация на лету.
+    // Смена хоткея — перерегистрация на лету: сначала занимаем новую
+    // комбинацию, потом отпускаем старую (валидность новой проверил UI).
     if old.hotkey != config.hotkey {
         crate::app::register_main_hotkey(&app, &config.hotkey).map_err(err_str)?;
-        if old.hotkey != config.hotkey {
-            let _ = state.services.hotkey.unregister(&old.hotkey);
-        }
+        let _ = state.services.hotkey.unregister(&old.hotkey);
     }
     Ok(())
 }

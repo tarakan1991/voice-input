@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  macos:
+    name: Сборка и проверки (macOS)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Зависимости фронтенда
+        run: npm ci
+
+      - name: Проверка типов фронтенда
+        run: npm run check
+
+      - name: Сборка фронтенда
+        run: npm run build
+
+      - name: Форматирование Rust
+        working-directory: src-tauri
+        run: cargo fmt -- --check
+
+      - name: Clippy (предупреждения = ошибки)
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Тесты
+        working-directory: src-tauri
+        run: cargo test
