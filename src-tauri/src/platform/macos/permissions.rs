@@ -23,9 +23,7 @@ extern "C" {}
 #[link(name = "ApplicationServices", kind = "framework")]
 extern "C" {
     fn AXIsProcessTrusted() -> u8;
-    fn AXIsProcessTrustedWithOptions(
-        options: core_foundation::dictionary::CFDictionaryRef,
-    ) -> u8;
+    fn AXIsProcessTrustedWithOptions(options: core_foundation::dictionary::CFDictionaryRef) -> u8;
     static kAXTrustedCheckOptionPrompt: core_foundation::string::CFStringRef;
 }
 
@@ -68,9 +66,8 @@ fn request_microphone() {
     let handler = RcBlock::new(|granted: Bool| {
         log::info!("доступ к микрофону: {}", granted.as_bool());
     });
-    let _: () = unsafe {
-        msg_send![cls, requestAccessForMediaType: &*media, completionHandler: &*handler]
-    };
+    let _: () =
+        unsafe { msg_send![cls, requestAccessForMediaType: &*media, completionHandler: &*handler] };
 }
 
 fn accessibility_trusted() -> bool {
@@ -82,8 +79,10 @@ fn accessibility_trusted() -> bool {
 fn request_accessibility() {
     unsafe {
         let key = CFString::wrap_under_get_rule(kAXTrustedCheckOptionPrompt);
-        let options =
-            CFDictionary::from_CFType_pairs(&[(key.as_CFType(), CFBoolean::true_value().as_CFType())]);
+        let options = CFDictionary::from_CFType_pairs(&[(
+            key.as_CFType(),
+            CFBoolean::true_value().as_CFType(),
+        )]);
         AXIsProcessTrustedWithOptions(options.as_concrete_TypeRef());
     }
 }

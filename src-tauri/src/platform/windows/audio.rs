@@ -17,7 +17,13 @@ impl AudioCapture for WindowsAudioCapture {
         unimplemented!("windows: определение встроенного микрофона по форм-фактору эндпоинта")
     }
 
-    fn open(&self, _selector: &DeviceSelector, _on_chunk: ChunkCallback) -> Result<Box<dyn CaptureStream>> {
-        unimplemented!("windows: открытие потока захвата с гарантией полного освобождения устройства")
+    fn open(
+        &self,
+        _selector: &DeviceSelector,
+        _on_chunk: ChunkCallback,
+    ) -> Result<Box<dyn CaptureStream>> {
+        unimplemented!(
+            "windows: открытие потока захвата с гарантией полного освобождения устройства"
+        )
     }
 }

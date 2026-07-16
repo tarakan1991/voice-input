@@ -11,10 +11,9 @@ use core_foundation::string::{CFString, CFStringRef};
 use coreaudio_sys::{
     kAudioDevicePropertyStreams, kAudioDevicePropertyTransportType,
     kAudioDeviceTransportTypeBuiltIn, kAudioHardwarePropertyDevices,
-    kAudioObjectPropertyElementMaster, kAudioObjectPropertyName,
-    kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyScopeInput,
-    kAudioObjectSystemObject, AudioObjectGetPropertyData, AudioObjectGetPropertyDataSize,
-    AudioObjectID, AudioObjectPropertyAddress,
+    kAudioObjectPropertyElementMaster, kAudioObjectPropertyName, kAudioObjectPropertyScopeGlobal,
+    kAudioObjectPropertyScopeInput, kAudioObjectSystemObject, AudioObjectGetPropertyData,
+    AudioObjectGetPropertyDataSize, AudioObjectID, AudioObjectPropertyAddress,
 };
 use std::sync::OnceLock;
 

@@ -44,7 +44,10 @@ impl CpalAudioCapture {
                 .default_input_device()
                 .ok_or_else(|| anyhow!("в системе нет устройства ввода по умолчанию")),
             DeviceSelector::Builtin => {
-                for d in host.input_devices().context("перечисление устройств ввода")? {
+                for d in host
+                    .input_devices()
+                    .context("перечисление устройств ввода")?
+                {
                     if let Ok(name) = device_name(&d) {
                         if (self.is_builtin)(&name) {
                             return Ok(d);
@@ -54,7 +57,10 @@ impl CpalAudioCapture {
                 bail!("встроенный микрофон не найден")
             }
             DeviceSelector::ById(id) => {
-                for d in host.input_devices().context("перечисление устройств ввода")? {
+                for d in host
+                    .input_devices()
+                    .context("перечисление устройств ввода")?
+                {
                     if device_id(&d).map(|n| &n == id).unwrap_or(false) {
                         return Ok(d);
                     }
@@ -68,11 +74,12 @@ impl CpalAudioCapture {
 impl AudioCapture for CpalAudioCapture {
     fn list_devices(&self) -> Result<Vec<AudioDevice>> {
         let host = cpal::default_host();
-        let default_id = host
-            .default_input_device()
-            .and_then(|d| device_id(&d).ok());
+        let default_id = host.default_input_device().and_then(|d| device_id(&d).ok());
         let mut out = Vec::new();
-        for d in host.input_devices().context("перечисление устройств ввода")? {
+        for d in host
+            .input_devices()
+            .context("перечисление устройств ввода")?
+        {
             let (Ok(id), Ok(name)) = (device_id(&d), device_name(&d)) else {
                 continue;
             };
@@ -129,8 +136,7 @@ impl AudioCapture for CpalAudioCapture {
                             stream_config,
                             move |data: &[i16], _: &cpal::InputCallbackInfo| {
                                 conv_buf.clear();
-                                conv_buf
-                                    .extend(data.iter().map(|&s| s as f32 / i16::MAX as f32));
+                                conv_buf.extend(data.iter().map(|&s| s as f32 / i16::MAX as f32));
                                 on_chunk(&conv_buf, sample_rate, channels);
                             },
                             err_fn,

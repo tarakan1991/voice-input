@@ -16,7 +16,7 @@ pub mod macos;
 pub mod windows;
 
 use anyhow::Result;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 // ---------------------------------------------------------------------------
@@ -116,7 +116,7 @@ pub trait FocusTracker: Send + Sync {
 // Разрешения
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Permission {
     Microphone,
@@ -194,4 +194,16 @@ pub fn create(app: &tauri::AppHandle) -> Result<PlatformServices> {
 #[cfg(target_os = "windows")]
 pub fn create(app: &tauri::AppHandle) -> Result<PlatformServices> {
     windows::create(app)
+}
+
+/// Платформенные плагины Tauri (например, nspanel на macOS).
+/// Общий код о них не знает — регистрация только здесь.
+#[cfg(target_os = "macos")]
+pub fn register_plugins<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    builder.plugin(tauri_nspanel::init())
+}
+
+#[cfg(target_os = "windows")]
+pub fn register_plugins<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    builder
 }
