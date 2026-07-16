@@ -1,18 +1,33 @@
 <script lang="ts">
-  // Кнопка отмены: отдельное неактивирующееся окно (этап 2).
+  // Отдельное окошко кнопки отмены: единственная кликабельная часть оверлея
+  // (сама плашка — click-through).
+  import { api } from "../lib/ipc";
+
+  function cancel() {
+    api.dictationCancel();
+  }
 </script>
 
-<div class="cancel-root">✕</div>
+<button class="cancel-root" onclick={cancel} title="Отменить диктовку (Esc)">
+  ✕
+</button>
 
 <style>
   .cancel-root {
+    width: 100vw;
     height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(24, 25, 32, 0.92);
+    background: rgba(22, 23, 30, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 50%;
-    color: #fff;
+    color: #f2f2f7;
+    font-size: 13px;
     cursor: pointer;
+    padding: 0;
+  }
+  .cancel-root:hover {
+    background: rgba(70, 30, 30, 0.95);
   }
 </style>
