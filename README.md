@@ -41,6 +41,10 @@
 |---|---|
 | <img src="docs/screenshots/settings.png" width="420"> | <img src="docs/screenshots/models.png" width="420"> |
 
+| Вычитка, словарь и вставка |
+|---|
+| <img src="docs/screenshots/postproc.png" width="560"> |
+
 ## Как установить (5 минут)
 
 Понадобится Мак на Apple Silicon (M1 и новее) и ~4 ГБ свободного места.
