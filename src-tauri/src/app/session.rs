@@ -284,6 +284,16 @@ fn run_dictation(
         reason
     };
 
+    // SPEC §4.4: «речи не было вообще» → Idle без обработки. Раньше это
+    // работало только для автостопа по тишине; стоп хоткеем без единого
+    // слова гонял Whisper по чистой тишине — на CPU (Windows) это минуты
+    // «обрабатываю» из-за случайного двойного нажатия.
+    let reason = if matches!(reason, StopReason::Process) && !tracker.had_speech() {
+        StopReason::NoSpeech
+    } else {
+        reason
+    };
+
     // ---- Микрофон закрывается ЗДЕСЬ, до любой обработки (инвариант №1). ----
     stream.close();
     if esc_registered {
