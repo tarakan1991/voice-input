@@ -69,7 +69,15 @@ pub trait AudioCapture: Send + Sync {
 // Глобальный хоткей
 // ---------------------------------------------------------------------------
 
-pub type HotkeyCallback = Box<dyn Fn() + Send + Sync>;
+/// Нажатие и отпускание глобальной комбинации — отпускание нужно режиму
+/// «удержание» (push-to-talk).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HotkeyEvent {
+    Pressed,
+    Released,
+}
+
+pub type HotkeyCallback = Box<dyn Fn(HotkeyEvent) + Send + Sync>;
 
 pub trait GlobalHotkey: Send + Sync {
     /// Регистрирует комбинацию (формат: "Ctrl+Alt+Space").

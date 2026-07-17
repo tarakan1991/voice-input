@@ -9,6 +9,14 @@
   let level = $state(0);
   let countdown = $state<number | null>(null);
   let hotkey = $state("");
+  let holdMode = $state(false);
+
+  function refreshHint() {
+    api.configGet().then((c) => {
+      hotkey = prettyHotkey(c.hotkey);
+      holdMode = c.hotkey_mode === "hold";
+    });
+  }
 
   // Столбики «эквалайзера»: автоусиление под голос говорящего (нормируем по
   // скользящему пику, а не по абсолютной шкале — RMS речи с ноутбучного
@@ -25,12 +33,14 @@
       detail = e.detail;
       if (e.state !== "recording") level = 0;
       if (e.state !== "recording") countdown = null;
+      // Хоткей и режим могли поменяться в настройках — обновляем подсказку.
+      if (e.state === "arming") refreshHint();
     }).then((u) => unsubs.push(u));
     events.onAudioLevel((l) => (level = l)).then((u) => unsubs.push(u));
     events
       .onSilenceCountdown((s) => (countdown = s))
       .then((u) => unsubs.push(u));
-    api.configGet().then((c) => (hotkey = prettyHotkey(c.hotkey)));
+    refreshHint();
 
     const timer = setInterval(() => {
       // Скользящий пик: медленно затухает, мгновенно подтягивается к громким
@@ -83,7 +93,7 @@
     {#if countdown !== null}
       <span class="countdown">стоп через {Math.ceil(countdown)}</span>
     {:else}
-      <span class="hint">{hotkey} — стоп</span>
+      <span class="hint">{holdMode ? "отпустите — стоп" : `${hotkey} — стоп`}</span>
     {/if}
   {:else if sessionState === "processing"}
     <div class="spinner"></div>

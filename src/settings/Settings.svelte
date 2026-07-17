@@ -86,6 +86,32 @@
     <section>
       <h2>Хоткей</h2>
       <HotkeyInput bind:value={config.hotkey} onvalid={() => save()} />
+      <div class="radio-row" style="margin-top: 10px">
+        <label>
+          <input
+            type="radio"
+            name="hkmode"
+            checked={config.hotkey_mode === "toggle"}
+            onchange={() => {
+              config!.hotkey_mode = "toggle";
+              save();
+            }}
+          />
+          Переключение — нажал, говоришь, нажал ещё раз (или тишина)
+        </label>
+        <label>
+          <input
+            type="radio"
+            name="hkmode"
+            checked={config.hotkey_mode === "hold"}
+            onchange={() => {
+              config!.hotkey_mode = "hold";
+              save();
+            }}
+          />
+          Удержание — говоришь, пока держишь комбинацию
+        </label>
+      </div>
     </section>
 
     <section>

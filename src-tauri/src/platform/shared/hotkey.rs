@@ -1,6 +1,6 @@
 //! Глобальный хоткей через tauri-plugin-global-shortcut (обе платформы).
 
-use crate::platform::{GlobalHotkey, HotkeyCallback};
+use crate::platform::{GlobalHotkey, HotkeyCallback, HotkeyEvent};
 use anyhow::{Context, Result};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
@@ -22,9 +22,11 @@ impl GlobalHotkey for PluginGlobalHotkey {
         self.app
             .global_shortcut()
             .on_shortcut(shortcut, move |_app, _sc, event| {
-                if event.state() == ShortcutState::Pressed {
-                    cb();
-                }
+                let event = match event.state() {
+                    ShortcutState::Pressed => HotkeyEvent::Pressed,
+                    ShortcutState::Released => HotkeyEvent::Released,
+                };
+                cb(event);
             })
             .with_context(|| format!("комбинация «{combo}» занята или не зарегистрировалась"))?;
         Ok(())

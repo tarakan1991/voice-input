@@ -288,10 +288,31 @@
         <MicPicker bind:value={config.microphone} />
       {:else if step === 4}
         <h2>Глобальный хоткей</h2>
-        <p class="muted">
-          Нажатие начинает диктовку, повторное — останавливает.
-        </p>
         <HotkeyInput bind:value={config.hotkey} />
+        <label class="option">
+          <input
+            type="radio"
+            name="hkmode"
+            checked={config.hotkey_mode === "toggle"}
+            onchange={() => (config!.hotkey_mode = "toggle")}
+          />
+          <div>
+            <strong>Переключение</strong>
+            <p class="muted">Нажал — говоришь — нажал ещё раз (или тишина).</p>
+          </div>
+        </label>
+        <label class="option">
+          <input
+            type="radio"
+            name="hkmode"
+            checked={config.hotkey_mode === "hold"}
+            onchange={() => (config!.hotkey_mode = "hold")}
+          />
+          <div>
+            <strong>Удержание</strong>
+            <p class="muted">Говоришь, пока держишь комбинацию; отпустил — стоп.</p>
+          </div>
+        </label>
       {:else if step === 5}
         <h2>Остановка по тишине</h2>
         <p class="muted">

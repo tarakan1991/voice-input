@@ -30,11 +30,11 @@ pub fn config_get(state: State<AppState>) -> AppConfig {
 pub fn config_set(app: AppHandle, state: State<AppState>, config: AppConfig) -> CmdResult<()> {
     let old = state.config.get();
     state.config.set(config.clone()).map_err(err_str)?;
-    // Смена хоткея — перерегистрация на лету: сначала занимаем новую
-    // комбинацию, потом отпускаем старую (валидность новой проверил UI).
-    if old.hotkey != config.hotkey {
-        crate::app::register_main_hotkey(&app, &config.hotkey).map_err(err_str)?;
+    // Смена комбинации или режима — перерегистрация на лету. Снять старую
+    // нужно до регистрации: при смене только режима комбинация та же.
+    if old.hotkey != config.hotkey || old.hotkey_mode != config.hotkey_mode {
         let _ = state.services.hotkey.unregister(&old.hotkey);
+        crate::app::register_main_hotkey(&app, &config.hotkey).map_err(err_str)?;
     }
     Ok(())
 }
@@ -254,7 +254,7 @@ pub fn hotkey_check(state: State<AppState>, combo: String) -> CmdResult<()> {
     state
         .services
         .hotkey
-        .register(&combo, Box::new(|| {}))
+        .register(&combo, Box::new(|_| {}))
         .map_err(err_str)?;
     state.services.hotkey.unregister(&combo).map_err(err_str)?;
     Ok(())

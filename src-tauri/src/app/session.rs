@@ -26,8 +26,12 @@ const ESC_COMBO: &str = "Escape";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SessionCommand {
-    /// Хоткей: старт записи или стоп с обработкой.
+    /// Хоткей (режим «переключение»): старт записи или стоп с обработкой.
     Toggle,
+    /// Хоткей (режим «удержание»): комбинация нажата — начать запись.
+    HoldPressed,
+    /// Хоткей (режим «удержание»): комбинация отпущена — стоп с обработкой.
+    HoldReleased,
     /// Отмена без вставки (Esc, кнопка ✕, трей).
     Cancel,
     /// Тестовая диктовка мастера: результат событием, без вставки.
@@ -43,6 +47,12 @@ pub struct SessionHandle {
 impl SessionHandle {
     pub fn toggle(&self) {
         let _ = self.tx.send(SessionCommand::Toggle);
+    }
+    pub fn hold_pressed(&self) {
+        let _ = self.tx.send(SessionCommand::HoldPressed);
+    }
+    pub fn hold_released(&self) {
+        let _ = self.tx.send(SessionCommand::HoldReleased);
     }
     pub fn cancel(&self) {
         let _ = self.tx.send(SessionCommand::Cancel);
@@ -79,13 +89,15 @@ pub fn spawn(deps: SessionDeps) -> SessionHandle {
 fn session_loop(deps: SessionDeps, rx: Receiver<SessionCommand>, self_handle: SessionHandle) {
     loop {
         // Idle: ждём команду.
-        let test_mode = match rx.recv() {
-            Ok(SessionCommand::Toggle) => false,
-            Ok(SessionCommand::Test) => true,
-            Ok(SessionCommand::Cancel) => continue,
+        let (test_mode, hold_mode) = match rx.recv() {
+            Ok(SessionCommand::Toggle) => (false, false),
+            Ok(SessionCommand::HoldPressed) => (false, true),
+            Ok(SessionCommand::Test) => (true, false),
+            // Отпускание в Idle — хвост предыдущей записи, игнорируем.
+            Ok(SessionCommand::Cancel) | Ok(SessionCommand::HoldReleased) => continue,
             Ok(SessionCommand::Shutdown) | Err(_) => return,
         };
-        match run_dictation(&deps, &rx, &self_handle, test_mode) {
+        match run_dictation(&deps, &rx, &self_handle, test_mode, hold_mode) {
             Ok(()) => {
                 crate::app::tray::set_state(&deps.app, crate::app::tray::TrayState::Idle);
             }
@@ -126,6 +138,7 @@ fn run_dictation(
     rx: &Receiver<SessionCommand>,
     self_handle: &SessionHandle,
     test_mode: bool,
+    hold_mode: bool,
 ) -> Result<()> {
     let config = deps.config.get();
     let app = &deps.app;
@@ -167,7 +180,14 @@ fn run_dictation(
     let esc_registered = deps
         .services
         .hotkey
-        .register(ESC_COMBO, Box::new(move || esc_session.cancel()))
+        .register(
+            ESC_COMBO,
+            Box::new(move |event| {
+                if event == crate::platform::HotkeyEvent::Pressed {
+                    esc_session.cancel();
+                }
+            }),
+        )
         .is_ok();
 
     let mut vad_engine = vad::SileroVad::new()?;
@@ -186,6 +206,13 @@ fn run_dictation(
         select! {
             recv(rx) -> cmd => match cmd {
                 Ok(SessionCommand::Toggle) => break 'record StopReason::Process,
+                // Повторные нажатия при удержании игнорируем.
+                Ok(SessionCommand::HoldPressed) => {}
+                Ok(SessionCommand::HoldReleased) => {
+                    if hold_mode {
+                        break 'record StopReason::Process;
+                    }
+                }
                 Ok(SessionCommand::Cancel) => break 'record StopReason::Cancelled,
                 Ok(SessionCommand::Test) => {} // уже записываем
                 Ok(SessionCommand::Shutdown) | Err(_) => break 'record StopReason::Shutdown,
@@ -244,6 +271,17 @@ fn run_dictation(
                 }
             },
         }
+    };
+
+    // Случайное короткое нажатие (особенно в режиме удержания) — тихая отмена:
+    // за треть секунды без речи распознавать нечего.
+    let reason = if matches!(reason, StopReason::Process)
+        && started.elapsed() < Duration::from_millis(350)
+        && !tracker.had_speech()
+    {
+        StopReason::Cancelled
+    } else {
+        reason
     };
 
     // ---- Микрофон закрывается ЗДЕСЬ, до любой обработки (инвариант №1). ----

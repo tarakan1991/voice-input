@@ -136,16 +136,25 @@ fn setup(app: &AppHandle) -> Result<()> {
     Ok(())
 }
 
-/// Регистрирует главный хоткей на текущую комбинацию из конфига.
+/// Регистрирует главный хоткей на текущую комбинацию и режим из конфига.
 pub fn register_main_hotkey(app: &AppHandle, combo: &str) -> Result<()> {
     let state = app.state::<AppState>();
     let session = state.session.clone();
     let paused = state.paused.clone();
+    let mode = state.config.get().hotkey_mode;
     state.services.hotkey.register(
         combo,
-        Box::new(move || {
-            if !paused.load(Ordering::Relaxed) {
-                session.toggle();
+        Box::new(move |event| {
+            use crate::config::HotkeyMode;
+            use crate::platform::HotkeyEvent;
+            if paused.load(Ordering::Relaxed) {
+                return;
+            }
+            match (mode, event) {
+                (HotkeyMode::Toggle, HotkeyEvent::Pressed) => session.toggle(),
+                (HotkeyMode::Toggle, HotkeyEvent::Released) => {}
+                (HotkeyMode::Hold, HotkeyEvent::Pressed) => session.hold_pressed(),
+                (HotkeyMode::Hold, HotkeyEvent::Released) => session.hold_released(),
             }
         }),
     )

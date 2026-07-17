@@ -77,6 +77,11 @@ impl SilenceTracker {
         }
     }
 
+    /// Была ли распознана речь с начала записи.
+    pub fn had_speech(&self) -> bool {
+        self.had_speech
+    }
+
     /// Длительность накопленной хвостовой тишины (для обрезки перед Whisper).
     pub fn trailing_silence_secs(&self) -> f32 {
         self.silence_secs

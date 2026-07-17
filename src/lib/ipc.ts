@@ -12,6 +12,7 @@ export type MicSelection =
   | { kind: "device"; id: string };
 
 export type PostprocMode = "off" | "local" | "cloud";
+export type HotkeyMode = "toggle" | "hold";
 export type CloudProvider = "anthropic" | "openai" | "deepseek";
 export type InjectionMode = "clipboard" | "typing";
 
@@ -39,6 +40,7 @@ export interface AppConfig {
   config_version: number;
   wizard_completed: boolean;
   hotkey: string;
+  hotkey_mode: HotkeyMode;
   microphone: MicSelection;
   language: string;
   silence_timeout_secs: number;

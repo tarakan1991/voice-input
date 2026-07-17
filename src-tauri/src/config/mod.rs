@@ -22,6 +22,15 @@ pub enum MicSelection {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+pub enum HotkeyMode {
+    /// Нажал — говоришь — нажал (или тишина).
+    Toggle,
+    /// Говоришь, пока держишь комбинацию; отпустил — стоп (push-to-talk).
+    Hold,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum InjectionMode {
     /// Через буфер обмена + Cmd+V (основной).
     Clipboard,
@@ -95,6 +104,7 @@ pub struct AppConfig {
     pub wizard_completed: bool,
     /// Формат tauri-plugin-global-shortcut: "Ctrl+Alt+Space".
     pub hotkey: String,
+    pub hotkey_mode: HotkeyMode,
     pub microphone: MicSelection,
     /// Язык распознавания зафиксирован («ru»), поле — задел на будущее.
     pub language: String,
@@ -120,6 +130,7 @@ impl Default for AppConfig {
             config_version: CURRENT_VERSION,
             wizard_completed: false,
             hotkey: "Ctrl+Alt+Space".into(),
+            hotkey_mode: HotkeyMode::Toggle,
             microphone: MicSelection::AlwaysBuiltin,
             language: "ru".into(),
             silence_timeout_secs: 5.0,
