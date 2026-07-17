@@ -149,11 +149,21 @@ npm run check              # svelte-check + tsc
 - Диагностические рычаги: `VOICE_INPUT_NO_GPU=1` (Whisper на CPU),
   `VOICE_INPUT_FLASH_ATTN=1` (flash attention в Whisper).
 
-- **TCC-права (микрофон, Accessibility) привязаны к подписи бинаря** и слетают при
-  каждой пересборке, если подпись ad-hoc. Один раз создать самоподписанный
-  сертификат (Keychain Access → Certificate Assistant → Code Signing) и подписывать
-  dev-сборки им — права выдаются один раз. Настроить в `tauri.conf.json`
-  (`signingIdentity`) или скриптом после сборки.
+- **TCC-права (микрофон, Accessibility) привязаны к подписи бинаря** и слетают
+  при каждой пересборке с ad-hoc подписью (designated requirement = cdhash
+  конкретного бинаря; запись в Настройках остаётся, но указывает на старый
+  бинарь — выглядит как «право выдано, а приложение его не видит»).
+  Решение уже настроено: в login-keychain лежит самоподписанный сертификат
+  **«VoiceInput Dev Signing»**; его designated requirement стабилен
+  (identifier + certificate leaf). Локальная сборка с подписью:
+  `APPLE_SIGNING_IDENTITY="VoiceInput Dev Signing" CI=true cargo tauri build`
+  (или переподписать готовый бандл:
+  `codesign --force --deep -s "VoiceInput Dev Signing" /Applications/VoiceInput.app`).
+  В tauri.conf.json identity сознательно НЕ прописан — на CI-раннере этого
+  сертификата нет, релизные артефакты CI остаются ad-hoc.
+  Если права всё же зависли (например, после установки ad-hoc сборки):
+  `tccutil reset Accessibility com.vixarev.voiceinput && tccutil reset
+  Microphone com.vixarev.voiceinput` и выдать заново.
 - `Info.plist` обязан содержать `NSMicrophoneUsageDescription` — иначе краш при
   первом обращении к микрофону.
 - Быстрая проверка микрофонного инварианта: оранжевая точка в строке меню +
