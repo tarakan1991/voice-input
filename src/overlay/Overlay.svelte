@@ -5,6 +5,7 @@
   import { api, events, prettyHotkey, type SessionState } from "../lib/ipc";
 
   let sessionState = $state<SessionState>("idle");
+  let detail = $state<string | null>(null);
   let level = $state(0);
   let countdown = $state<number | null>(null);
   let hotkey = $state("");
@@ -16,10 +17,11 @@
 
   onMount(() => {
     const unsubs: Array<() => void> = [];
-    events.onSessionState((s) => {
-      sessionState = s;
-      if (s !== "recording") level = 0;
-      if (s !== "recording") countdown = null;
+    events.onSessionState((e) => {
+      sessionState = e.state;
+      detail = e.detail;
+      if (e.state !== "recording") level = 0;
+      if (e.state !== "recording") countdown = null;
     }).then((u) => unsubs.push(u));
     events.onAudioLevel((l) => (level = l)).then((u) => unsubs.push(u));
     events
@@ -28,11 +30,13 @@
     api.configGet().then((c) => (hotkey = prettyHotkey(c.hotkey)));
 
     const timer = setInterval(() => {
-      // Плавное затухание + распределение по столбикам
-      smoothed = smoothed * 0.6 + level * 0.4;
+      // Перцептивная шкала: тихая речь (RMS ~0.03–0.3) должна заметно
+      // двигать столбики, иначе кажется, что звук не захватывается.
+      const perceptual = Math.min(1, Math.sqrt(level * 6));
+      smoothed = smoothed * 0.6 + perceptual * 0.4;
       bars = bars.map((_: number, i: number) => {
         const phase = Math.sin(Date.now() / 90 + i * 1.7) * 0.35 + 0.65;
-        return Math.max(0.06, Math.min(1, smoothed * 3.2 * phase));
+        return Math.max(0.06, Math.min(1, smoothed * phase));
       });
     }, 66);
     return () => {
@@ -42,21 +46,23 @@
   });
 
   const statusText = $derived(
-    sessionState === "arming"
-      ? "подключаю микрофон…"
-      : sessionState === "recording"
-        ? "говорите"
-        : sessionState === "processing"
-          ? "обрабатываю…"
-          : sessionState === "error"
-            ? "ошибка"
+    sessionState === "error" || sessionState === "notice"
+      ? (detail ?? "ошибка")
+      : sessionState === "arming"
+        ? "подключаю микрофон…"
+        : sessionState === "recording"
+          ? "говорите"
+          : sessionState === "processing"
+            ? "обрабатываю…"
             : "",
   );
 </script>
 
 <div class="overlay-root" data-state={sessionState}>
   <span class="dot" data-state={sessionState}></span>
-  <span class="status">{statusText}</span>
+  <span class="status" class:error={sessionState === "error"} class:notice={sessionState === "notice"}>
+    {statusText}
+  </span>
 
   {#if sessionState === "recording"}
     <div class="bars">
@@ -107,6 +113,12 @@
   .dot[data-state="processing"] {
     background: #ff9f0a;
   }
+  .dot[data-state="error"] {
+    background: #ff453a;
+  }
+  .dot[data-state="notice"] {
+    background: #ffd60a;
+  }
 
   @keyframes pulse {
     50% {
@@ -116,6 +128,21 @@
 
   .status {
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .status.error {
+    color: #ff6b61;
+    white-space: normal;
+    font-size: 12px;
+    line-height: 1.25;
+  }
+  .status.notice {
+    color: #ffd60a;
+    white-space: normal;
+    font-size: 12px;
+    line-height: 1.25;
   }
 
   .bars {

@@ -144,7 +144,7 @@
       case 4:
         return config.hotkey.length > 0;
       case 7:
-        return testResult !== null;
+        return testResult !== null && testResult.error === null;
       default:
         return true;
     }
@@ -335,27 +335,33 @@
           {testRunning ? "Слушаю… говорите" : "Начать проверку"}
         </button>
         {#if testResult}
-          <div class="result">
-            <div>
-              <h3>Распознано</h3>
-              <p>{testResult.raw}</p>
-              <span class="muted">{(testResult.asr_ms / 1000).toFixed(1)} с</span>
+          {#if testResult.error}
+            <div class="test-error">
+              Проверка не удалась: {testResult.error}
             </div>
-            <div>
-              <h3>
-                После вычитки
-                {#if testResult.postproc === "raw"}
-                  <span class="muted">(вычитка не применялась)</span>
+          {:else}
+            <div class="result">
+              <div>
+                <h3>Распознано</h3>
+                <p>{testResult.raw}</p>
+                <span class="muted">{(testResult.asr_ms / 1000).toFixed(1)} с</span>
+              </div>
+              <div>
+                <h3>
+                  После вычитки
+                  {#if testResult.postproc === "raw"}
+                    <span class="muted">(вычитка не применялась)</span>
+                  {/if}
+                </h3>
+                <p>{testResult.clean}</p>
+                {#if testResult.postproc !== "raw"}
+                  <span class="muted">
+                    {(testResult.postproc_ms / 1000).toFixed(1)} с
+                  </span>
                 {/if}
-              </h3>
-              <p>{testResult.clean}</p>
-              {#if testResult.postproc !== "raw"}
-                <span class="muted">
-                  {(testResult.postproc_ms / 1000).toFixed(1)} с
-                </span>
-              {/if}
+              </div>
             </div>
-          </div>
+          {/if}
         {/if}
       {/if}
     </main>
@@ -496,5 +502,11 @@
   }
   .result p {
     margin: 0 0 6px;
+  }
+  .test-error {
+    border: 1px solid var(--danger);
+    border-radius: 10px;
+    padding: 12px;
+    color: var(--danger);
   }
 </style>

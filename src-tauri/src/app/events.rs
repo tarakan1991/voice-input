@@ -17,7 +17,11 @@ pub const NAVIGATE: &str = "navigate";
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SessionStatePayload {
+    /// idle | arming | recording | processing | error | notice
     pub state: &'static str,
+    /// Текст для плашки (ошибка или уведомление) — системные уведомления
+    /// могут быть выключены, оверлей видно всегда.
+    pub detail: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -40,6 +44,8 @@ pub struct DictationResultPayload {
     pub postproc: &'static str,
     pub asr_ms: u64,
     pub postproc_ms: u64,
+    /// Тестовая диктовка не удалась (мастер показывает причину и не виснет).
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

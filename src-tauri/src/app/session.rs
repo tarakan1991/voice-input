@@ -97,7 +97,13 @@ fn session_loop(deps: SessionDeps, rx: Receiver<SessionCommand>, self_handle: Se
                 if config.sounds_enabled {
                     cues::play(cues::Cue::Error);
                 }
+                if test_mode {
+                    emit_test_error(&deps.app, &format!("{e}"));
+                }
                 notify(&deps.app, &format!("Диктовка не удалась: {e}"));
+                // Ошибку показываем на плашке: системные уведомления могут
+                // быть выключены, а молча ронять диктовку нельзя.
+                show_on_overlay(&deps, "error", &format!("{e}"), 4);
             }
         }
         emit_state(&deps.app, "idle");
@@ -262,7 +268,12 @@ fn run_dictation(
             if config.sounds_enabled {
                 cues::play(cues::Cue::Cancel);
             }
-            notify(app, "Речи не слышно — диктовка отменена");
+            let message = "Речи не слышно — диктовка отменена. Проверьте, тот ли микрофон выбран";
+            if test_mode {
+                emit_test_error(app, message);
+            }
+            notify(app, message);
+            show_on_overlay(deps, "notice", message, 3);
             return Ok(());
         }
         StopReason::Process => {}
@@ -301,7 +312,12 @@ fn process_and_inject(
 ) -> Result<()> {
     let app = &deps.app;
     if native_buf.is_empty() || native_rate == 0 {
-        notify(app, "Запись пуста — ничего не распозналось");
+        let message = "Запись пуста — микрофон не отдал ни одного сэмпла";
+        if test_mode {
+            emit_test_error(app, message);
+        }
+        notify(app, message);
+        show_on_overlay(deps, "notice", message, 3);
         return Ok(());
     }
 
@@ -326,7 +342,12 @@ fn process_and_inject(
         deps.asr
             .transcribe(&model_path, model_id, &samples, &config.language, &prompt)?;
     if asr_out.text.is_empty() {
-        notify(app, "Не удалось разобрать речь — попробуйте ещё раз");
+        let message = "Не удалось разобрать речь — попробуйте ещё раз";
+        if test_mode {
+            emit_test_error(app, message);
+        }
+        notify(app, message);
+        show_on_overlay(deps, "notice", message, 3);
         return Ok(());
     }
 
@@ -349,6 +370,7 @@ fn process_and_inject(
                 postproc: used,
                 asr_ms: asr_out.elapsed_ms,
                 postproc_ms,
+                error: None,
             },
         );
         return Ok(());
@@ -359,17 +381,15 @@ fn process_and_inject(
     let status = match outcome {
         InjectionOutcome::Injected => "injected",
         InjectionOutcome::LeftInClipboard => {
-            notify(
-                app,
-                "Фокус ушёл в другое приложение — текст в буфере обмена",
-            );
+            let message = "Фокус ушёл в другое приложение — текст в буфере обмена";
+            notify(app, message);
+            show_on_overlay(deps, "notice", message, 3);
             "left_in_clipboard"
         }
         InjectionOutcome::BlockedSecureInput => {
-            notify(
-                app,
-                "Активно поле пароля — вставка невозможна, текст в буфере обмена",
-            );
+            let message = "Активно поле пароля — вставка невозможна, текст в буфере обмена";
+            notify(app, message);
+            show_on_overlay(deps, "notice", message, 3);
             "left_in_clipboard"
         }
     };
@@ -445,7 +465,42 @@ fn run_postproc(deps: &SessionDeps, config: &AppConfig, raw: &str) -> (String, &
 }
 
 fn emit_state(app: &AppHandle, state: &'static str) {
-    let _ = app.emit(events::SESSION_STATE, events::SessionStatePayload { state });
+    let _ = app.emit(
+        events::SESSION_STATE,
+        events::SessionStatePayload {
+            state,
+            detail: None,
+        },
+    );
+}
+
+/// Показывает сообщение на плашке `secs` секунд (state: "error" | "notice").
+/// Оверлей уже видим во время диктовки; после паузы session_loop его спрячет.
+fn show_on_overlay(deps: &SessionDeps, state: &'static str, message: &str, secs: u64) {
+    let _ = deps.app.emit(
+        events::SESSION_STATE,
+        events::SessionStatePayload {
+            state,
+            detail: Some(message.to_string()),
+        },
+    );
+    std::thread::sleep(Duration::from_secs(secs));
+}
+
+/// Результат тестовой диктовки с ошибкой — мастер показывает причину
+/// вместо вечного «слушаю».
+fn emit_test_error(app: &AppHandle, message: &str) {
+    let _ = app.emit(
+        events::DICTATION_RESULT,
+        events::DictationResultPayload {
+            raw: String::new(),
+            clean: String::new(),
+            postproc: "raw",
+            asr_ms: 0,
+            postproc_ms: 0,
+            error: Some(message.to_string()),
+        },
+    );
 }
 
 fn notify(app: &AppHandle, body: &str) {

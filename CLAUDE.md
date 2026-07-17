@@ -137,6 +137,18 @@ npm run check              # svelte-check + tsc
 
 ## Dev-заметки (macOS)
 
+- **llama-cpp-2 обязан собираться с фичей `dynamic-link`** — иначе его копия
+  ggml конфликтует с копией из whisper-rs (одинаковые C-символы), whisper
+  получает чужой Metal-бэкенд и возвращает пустой текст (NaN-логиты).
+  Dylib-библиотеки кладутся в `src-tauri/frameworks/` (beforeBundleCommand
+  `npm run sync-dylibs`) и попадают в Contents/Frameworks; rpath задаёт build.rs.
+- Смоук-тесты на реальных моделях (обязательны после изменений в asr/postproc
+  или обновления whisper-rs/llama-cpp-2):
+  `VOICE_INPUT_MODEL=~/Library/Application\ Support/com.vixarev.voiceinput/models/ggml-large-v3-turbo.bin cargo test asr_smoke -- --ignored --nocapture`
+  и аналогично `VOICE_INPUT_LLM=<путь к gguf> cargo test llm_smoke -- --ignored --nocapture`.
+- Диагностические рычаги: `VOICE_INPUT_NO_GPU=1` (Whisper на CPU),
+  `VOICE_INPUT_FLASH_ATTN=1` (flash attention в Whisper).
+
 - **TCC-права (микрофон, Accessibility) привязаны к подписи бинаря** и слетают при
   каждой пересборке, если подпись ad-hoc. Один раз создать самоподписанный
   сертификат (Keychain Access → Certificate Assistant → Code Signing) и подписывать

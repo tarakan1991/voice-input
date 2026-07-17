@@ -55,7 +55,18 @@ impl AsrEngine {
         let path_str = model_path
             .to_str()
             .context("путь к модели содержит невалидный UTF-8")?;
-        let ctx = WhisperContext::new_with_params(path_str, WhisperContextParameters::default())
+        let mut ctx_params = WhisperContextParameters::default();
+        // Аварийный рычаг: VOICE_INPUT_NO_GPU=1 переводит Whisper на CPU
+        // (диагностика проблем Metal).
+        if std::env::var_os("VOICE_INPUT_NO_GPU").is_some() {
+            log::warn!("VOICE_INPUT_NO_GPU задан — Whisper работает на CPU");
+            ctx_params.use_gpu(false);
+        }
+        if std::env::var_os("VOICE_INPUT_FLASH_ATTN").is_some() {
+            log::warn!("VOICE_INPUT_FLASH_ATTN задан — включён flash attention");
+            ctx_params.flash_attn(true);
+        }
+        let ctx = WhisperContext::new_with_params(path_str, ctx_params)
             .with_context(|| format!("не удалось загрузить модель {model_id}"))?;
         *guard = Some(Loaded {
             model_id: model_id.to_string(),
@@ -107,21 +118,29 @@ impl AsrEngine {
         state.full(params, samples_16k).context("распознавание")?;
 
         let mut pieces: Vec<String> = Vec::new();
-        for i in 0..state.full_n_segments() {
+        let n_segments = state.full_n_segments();
+        log::debug!("whisper вернул {n_segments} сегментов");
+        for i in 0..n_segments {
             let Some(segment) = state.get_segment(i) else {
                 continue;
             };
-            if segment.no_speech_probability() > NO_SPEECH_PROB_CUTOFF {
-                continue;
-            }
-            let Ok(text) = segment.to_str_lossy() else {
-                continue;
+            let no_speech = segment.no_speech_probability();
+            let text = match segment.to_str_lossy() {
+                Ok(t) => t.trim().to_string(),
+                Err(e) => {
+                    log::warn!("сегмент {i} не декодируется: {e}");
+                    continue;
+                }
             };
-            let trimmed = text.trim();
-            if trimmed.is_empty() || is_hallucination(trimmed) {
+            log::debug!("сегмент {i}: no_speech={no_speech:.2} текст=«{text}»");
+            if no_speech > NO_SPEECH_PROB_CUTOFF {
+                log::info!("сегмент {i} отброшен по no_speech_prob={no_speech:.2}");
                 continue;
             }
-            pieces.push(trimmed.to_string());
+            if text.is_empty() || is_hallucination(&text) {
+                continue;
+            }
+            pieces.push(text);
         }
 
         *self.last_used.lock() = Instant::now();
@@ -160,5 +179,36 @@ mod tests {
         assert!(is_hallucination("Субтитры сделал DimaTorzok"));
         assert!(is_hallucination("ПРОДОЛЖЕНИЕ СЛЕДУЕТ..."));
         assert!(!is_hallucination("Задеплой изменения на стейджинг"));
+    }
+
+    /// Смоук-тест на реальной модели: путь передаётся через VOICE_INPUT_MODEL.
+    /// Запуск: VOICE_INPUT_MODEL=~/.../ggml-large-v3-turbo.bin \
+    ///   cargo test asr_smoke -- --ignored --nocapture
+    #[test]
+    #[ignore = "требует скачанную модель (VOICE_INPUT_MODEL)"]
+    fn asr_smoke_on_test_sample() {
+        let _ =
+            env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug"))
+                .is_test(false)
+                .try_init();
+        let model = std::env::var("VOICE_INPUT_MODEL").expect("нужен VOICE_INPUT_MODEL");
+        let pcm = crate::models::test_sample_pcm().unwrap();
+        eprintln!(
+            "сэмпл: {} сэмплов, rms={}",
+            pcm.len(),
+            crate::audio::rms(&pcm)
+        );
+        let engine = AsrEngine::new();
+        let out = engine
+            .transcribe(
+                std::path::Path::new(&model),
+                "smoke",
+                &pcm,
+                "ru",
+                &crate::dictionary::Dictionary::default().initial_prompt(),
+            )
+            .unwrap();
+        eprintln!("РЕЗУЛЬТАТ ({} мс): «{}»", out.elapsed_ms, out.text);
+        assert!(!out.text.is_empty(), "модель вернула пустой текст");
     }
 }

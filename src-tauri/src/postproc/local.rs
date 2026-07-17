@@ -151,3 +151,35 @@ impl LocalLlm {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Смоук на реальной модели (проверяет и изоляцию ggml от whisper):
+    /// VOICE_INPUT_LLM=~/.../qwen2.5-1.5b-instruct-q4_k_m.gguf \
+    ///   cargo test llm_smoke -- --ignored --nocapture
+    #[test]
+    #[ignore = "требует скачанную модель (VOICE_INPUT_LLM)"]
+    fn llm_smoke_cleanup() {
+        let model = std::env::var("VOICE_INPUT_LLM").expect("нужен VOICE_INPUT_LLM");
+        let llm = LocalLlm::new().unwrap();
+        let raw = "ээ ну короче надо задеплоить это на стейджинг и и создать пул реквест";
+        let out = llm
+            .cleanup(
+                std::path::Path::new(&model),
+                "smoke",
+                &crate::postproc::system_prompt(""),
+                crate::postproc::few_shot(),
+                raw,
+                Duration::from_secs(120),
+            )
+            .unwrap();
+        eprintln!("ВЫЧИТКА: «{out}»");
+        assert!(!out.is_empty());
+        assert!(
+            crate::postproc::apply_guardrails(raw, &out).is_some(),
+            "guardrails забраковали: «{out}»"
+        );
+    }
+}

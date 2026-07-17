@@ -110,7 +110,13 @@ export type SessionState =
   | "arming"
   | "recording"
   | "processing"
-  | "error";
+  | "error"
+  | "notice";
+
+export interface SessionStateEvent {
+  state: SessionState;
+  detail: string | null;
+}
 
 export interface DictationResult {
   raw: string;
@@ -118,6 +124,7 @@ export interface DictationResult {
   postproc: "local" | "cloud" | "raw";
   asr_ms: number;
   postproc_ms: number;
+  error: string | null;
 }
 
 export interface DownloadProgress {
@@ -185,8 +192,8 @@ export const api = {
 // ---------------------------------------------------------------------------
 
 export const events = {
-  onSessionState: (cb: (state: SessionState) => void): Promise<UnlistenFn> =>
-    listen<{ state: SessionState }>("session-state", (e) => cb(e.payload.state)),
+  onSessionState: (cb: (e: SessionStateEvent) => void): Promise<UnlistenFn> =>
+    listen<SessionStateEvent>("session-state", (e) => cb(e.payload)),
   onAudioLevel: (cb: (level: number) => void): Promise<UnlistenFn> =>
     listen<{ level: number }>("audio-level", (e) => cb(e.payload.level)),
   onSilenceCountdown: (

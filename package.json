@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
+    "sync-dylibs": "mkdir -p src-tauri/frameworks && cp -f src-tauri/target/release/libllama*.0.dylib src-tauri/target/release/libggml*.0.dylib src-tauri/frameworks/",
     "tauri": "tauri"
   },
   "dependencies": {

@@ -26,7 +26,12 @@ rubato = "4"
 hound = "3.5"
 voice_activity_detector = "0.2.1"
 whisper-rs = { version = "0.16", features = ["metal"] }
-llama-cpp-2 = { version = "0.1.151", features = ["metal"] }
+# ВАЖНО: dynamic-link обязателен. whisper-rs и llama-cpp-2 несут РАЗНЫЕ копии
+# ggml; при статической линковке обеих C-символы ggml_* конфликтуют, линкер
+# оставляет одну копию, и whisper получает чужой Metal-бэкенд с несовместимым
+# ABI → NaN-логиты и пустое распознавание. Dylib изолирует символы llama
+# (two-level namespace macOS). Подробности: PROGRESS.md.
+llama-cpp-2 = { version = "0.1.151", features = ["metal", "dynamic-link"] }
 arboard = "3.6"
 rusqlite = { version = "0.40", features = ["bundled"] }
 keyring = { version = "3", features = ["apple-native", "windows-native"] }
