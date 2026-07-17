@@ -5,7 +5,8 @@
 use crate::app::events;
 use crate::platform::PlatformServices;
 use tauri::{
-    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder,
+    AppHandle, Emitter, Listener, LogicalSize, Manager, PhysicalPosition, WebviewUrl,
+    WebviewWindowBuilder,
 };
 
 pub const OVERLAY_LABEL: &str = "overlay";
@@ -18,7 +19,14 @@ const GAP: f64 = 8.0;
 const MARGIN_BOTTOM: f64 = 72.0;
 
 /// Создаёт оба окна (скрытыми) и превращает их в неактивирующиеся панели.
+/// Плюс подписка на нативные клики платформы: там, где вебвью в
+/// неактивирующемся окне не доводит клик до DOM (WebView2), платформа шлёт
+/// OVERLAY_NATIVE_CLICK_EVENT — трактуем как кнопку ✕ (отмена диктовки).
 pub fn create_windows(app: &AppHandle, services: &PlatformServices) -> anyhow::Result<()> {
+    let session = app.state::<crate::app::state::AppState>().session.clone();
+    app.listen(crate::platform::OVERLAY_NATIVE_CLICK_EVENT, move |_| {
+        session.cancel();
+    });
     let overlay =
         WebviewWindowBuilder::new(app, OVERLAY_LABEL, WebviewUrl::App("index.html".into()))
             .title("VoiceInput Overlay")
@@ -36,6 +44,9 @@ pub fn create_windows(app: &AppHandle, services: &PlatformServices) -> anyhow::R
     let cancel = WebviewWindowBuilder::new(app, CANCEL_LABEL, WebviewUrl::App("index.html".into()))
         .title("VoiceInput Cancel")
         .inner_size(CANCEL_SIZE, CANCEL_SIZE)
+        // Без явного минимума Windows раздувает окно до системной
+        // минимальной ширины (~136px), и кнопка занимает лишь угол.
+        .min_inner_size(CANCEL_SIZE, CANCEL_SIZE)
         .decorations(false)
         .transparent(true)
         .shadow(false)
@@ -88,6 +99,10 @@ pub fn show(app: &AppHandle, services: &PlatformServices) {
         let y = mpos.y as f64 + msize.height as f64 - (PLATE_H + MARGIN_BOTTOM) * scale;
         overlay.set_size(LogicalSize::new(PLATE_W, PLATE_H))?;
         overlay.set_position(PhysicalPosition::new(x, y))?;
+        // Размер кнопки задаётся и здесь: при создании Windows раздувает
+        // окно до системной минимальной ширины, и справа от кнопки остаётся
+        // невидимая кликабельная полоса.
+        cancel.set_size(LogicalSize::new(CANCEL_SIZE, CANCEL_SIZE))?;
         let cancel_y = y + ((PLATE_H - CANCEL_SIZE) / 2.0) * scale;
         cancel.set_position(PhysicalPosition::new(x + (PLATE_W + GAP) * scale, cancel_y))?;
 

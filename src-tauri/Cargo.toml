@@ -25,13 +25,6 @@ cpal = "0.18"
 rubato = "4"
 hound = "3.5"
 voice_activity_detector = "0.2.1"
-whisper-rs = { version = "0.16", features = ["metal"] }
-# ВАЖНО: dynamic-link обязателен. whisper-rs и llama-cpp-2 несут РАЗНЫЕ копии
-# ggml; при статической линковке обеих C-символы ggml_* конфликтуют, линкер
-# оставляет одну копию, и whisper получает чужой Metal-бэкенд с несовместимым
-# ABI → NaN-логиты и пустое распознавание. Dylib изолирует символы llama
-# (two-level namespace macOS). Подробности: PROGRESS.md.
-llama-cpp-2 = { version = "0.1.151", features = ["metal", "dynamic-link"] }
 arboard = "3.6"
 rusqlite = { version = "0.40", features = ["bundled"] }
 keyring = { version = "3", features = ["apple-native", "windows-native"] }
@@ -40,7 +33,20 @@ ureq = "3.3"
 regex = "1"
 encoding_rs = "0.8"
 
+# whisper-rs и llama-cpp-2 объявлены per-target: фича metal существует только
+# на macOS (whisper-rs-sys с ней безусловно включает GGML_METAL и ломает
+# сборку на Windows).
+#
+# ВАЖНО: dynamic-link у llama-cpp-2 обязателен НА ОБЕИХ платформах. whisper-rs
+# и llama-cpp-2 несут РАЗНЫЕ копии ggml; при статической линковке обеих
+# C-символы ggml_* конфликтуют, линкер оставляет одну копию, и whisper получает
+# чужой бэкенд с несовместимым ABI → NaN-логиты и пустое распознавание.
+# macOS: dylib + two-level namespace изолируют символы llama. Windows: llama
+# уходит в DLL со своим пространством имён, статический ggml whisper-rs в exe
+# с ним не пересекается. Подробности: PROGRESS.md, риск R-13 в SPEC.md.
 [target.'cfg(target_os = "macos")'.dependencies]
+whisper-rs = { version = "0.16", features = ["metal"] }
+llama-cpp-2 = { version = "0.1.151", features = ["metal", "dynamic-link"] }
 objc2 = "0.6"
 block2 = "0.6"
 coreaudio-sys = "0.2"
@@ -58,6 +64,24 @@ objc2-app-kit = { version = "0.3", features = [
 ] }
 core-graphics = "0.25"
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1" }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+whisper-rs = "0.16"
+llama-cpp-2 = { version = "0.1.151", features = ["dynamic-link"] }
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Variant",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_PropertiesSystem",
+    "Win32_Media_Audio",
+    "Win32_Devices_FunctionDiscovery",
+] }
 
 [profile.release]
 lto = "thin"

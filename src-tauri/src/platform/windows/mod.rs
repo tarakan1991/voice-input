@@ -1,38 +1,28 @@
-//! Заглушки Windows — этап 2.
+//! Реализации платформенной границы для Windows (этап 2).
 //!
-//! Каждая заглушка — честный `unimplemented!()`, а не тихий no-op: no-op
-//! маскировал бы пропущенную работу. Файлы компилируются на всех платформах,
-//! чтобы структура этапа 2 была видна и синтаксически корректна с первого дня.
-
-// До этапа 2 структуры не используются на macOS-сборке.
-#![allow(dead_code)]
+//! Кроссплатформенные части (cpal-аудио, плагины хоткеев и автозапуска)
+//! берутся из `shared/` — так же, как в фабрике macOS. Платформенные здесь:
+//! оверлей (WS_EX_NOACTIVATE), вставка (SendInput), фокус
+//! (GetForegroundWindow), разрешения (тумблер микрофона в реестре).
 
 mod audio;
-mod autostart;
 mod focus;
-mod hotkey;
 mod inject;
 mod overlay;
 mod permissions;
 
-// До этапа 2 реэкспорты не используются: фабрика Windows соберёт их,
-// когда появится реальная реализация.
-#[allow(unused_imports)]
-pub use audio::WindowsAudioCapture;
-#[allow(unused_imports)]
-pub use autostart::WindowsAutostart;
-#[allow(unused_imports)]
-pub use focus::WindowsFocusTracker;
-#[allow(unused_imports)]
-pub use hotkey::WindowsGlobalHotkey;
-#[allow(unused_imports)]
-pub use inject::WindowsTextInjector;
-#[allow(unused_imports)]
-pub use overlay::WindowsOverlayWindow;
-#[allow(unused_imports)]
-pub use permissions::WindowsPermissionChecker;
+use super::{shared, PlatformServices};
+use anyhow::Result;
+use std::sync::Arc;
 
-#[cfg(target_os = "windows")]
-pub fn create(_app: &tauri::AppHandle) -> anyhow::Result<super::PlatformServices> {
-    unimplemented!("windows: сборка фабрики платформенных сервисов — этап 2")
+pub fn create(app: &tauri::AppHandle) -> Result<PlatformServices> {
+    Ok(PlatformServices {
+        audio: Arc::new(shared::CpalAudioCapture::new(audio::builtin_matcher())),
+        hotkey: Arc::new(shared::PluginGlobalHotkey::new(app.clone())),
+        injector: Arc::new(inject::WindowsTextInjector),
+        focus: Arc::new(focus::WindowsFocusTracker),
+        permissions: Arc::new(permissions::WindowsPermissionChecker),
+        overlay: Arc::new(overlay::WindowsOverlayWindow),
+        autostart: Arc::new(shared::PluginAutostart::new(app.clone())),
+    })
 }

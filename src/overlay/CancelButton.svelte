@@ -1,6 +1,8 @@
 <script lang="ts">
   // Отдельное окошко кнопки отмены: единственная кликабельная часть оверлея
-  // (сама плашка — click-through).
+  // (сама плашка — click-through). На Windows клик дополнительно ловится
+  // нативно (WebView2 в неактивирующемся окне не доводит его до DOM) —
+  // это делает Rust-слой, см. overlay_ctl и platform::OVERLAY_NATIVE_CLICK_EVENT.
   import { api } from "../lib/ipc";
 
   function cancel() {
