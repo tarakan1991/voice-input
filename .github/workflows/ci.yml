@@ -45,3 +45,54 @@ jobs:
       - name: Тесты
         working-directory: src-tauri
         run: cargo test
+
+  windows:
+    name: Сборка и проверки (Windows)
+    runs-on: windows-latest
+    env:
+      # bindgen (whisper-rs-sys, llama-cpp-sys-2) требует libclang.
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+      # Не даём ggml whisper'а печь бинарь под CPU раннера (GGML_NATIVE):
+      # фиксируем базовый уровень AVX2+FMA — тот же, что x86-64-v3 в
+      # .cargo/config.toml. whisper-rs-sys пробрасывает GGML_* в CMake.
+      GGML_NATIVE: OFF
+      GGML_AVX2: ON
+      GGML_FMA: ON
+      GGML_F16C: ON
+      GGML_BMI2: ON
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Зависимости фронтенда
+        run: npm ci
+
+      - name: Проверка типов фронтенда
+        run: npm run check
+
+      - name: Сборка фронтенда
+        run: npm run build
+
+      - name: Форматирование Rust
+        working-directory: src-tauri
+        run: cargo fmt -- --check
+
+      - name: Clippy (предупреждения = ошибки)
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Тесты
+        working-directory: src-tauri
+        run: cargo test

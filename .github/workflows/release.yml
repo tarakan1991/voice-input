@@ -1,7 +1,7 @@
 name: Release
 
-# Релиз по тегу v*: сборка .dmg (macOS, Apple Silicon) и публикация
-# артефактов в GitHub Releases. Windows добавится на этапе 2.
+# Релиз по тегу v*: сборка .dmg (macOS, Apple Silicon) и NSIS-инсталлера
+# (Windows x64), публикация артефактов в GitHub Releases.
 # Формат артефактов совместим с tauri-plugin-updater (задел на будущее).
 
 on:
@@ -40,4 +40,45 @@ jobs:
         with:
           files: |
             src-tauri/target/release/bundle/dmg/*.dmg
+          generate_release_notes: true
+
+  windows:
+    name: Windows (x64, NSIS)
+    runs-on: windows-latest
+    env:
+      # bindgen (whisper-rs-sys, llama-cpp-sys-2) требует libclang.
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+      # Релизный бинарь обязан быть воспроизводимым по набору инструкций:
+      # базовый уровень AVX2+FMA (как x86-64-v3 в .cargo/config.toml),
+      # а не возможности CPU конкретного раннера (GGML_NATIVE).
+      GGML_NATIVE: OFF
+      GGML_AVX2: ON
+      GGML_FMA: ON
+      GGML_F16C: ON
+      GGML_BMI2: ON
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Зависимости фронтенда
+        run: npm ci
+
+      - name: Сборка приложения (NSIS-инсталлер)
+        run: npx tauri build
+
+      - name: Публикация в GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            src-tauri/target/release/bundle/nsis/*.exe
           generate_release_notes: true
