@@ -14,9 +14,9 @@
   `voice_activity_detector` + `ort` (Silero VAD), `rubato`, `arboard`, `rusqlite`,
   `keyring`, `serde`, `thiserror`/`anyhow`, `objc2` (macOS-слой).
 - **Плагины Tauri**: global-shortcut, autostart, notification.
-- **Платформы**: macOS 12+ (только Apple Silicon), затем Windows 10/11 x64.
-  Этап 1 — macOS целиком; `platform/windows/` до этапа 2 — заглушки
-  `unimplemented!()`, но проект обязан компилироваться с ними.
+- **Платформы**: macOS 12+ (только Apple Silicon) и Windows 10/11 x64.
+  Обе платформы собираются и проверяются в CI; `platform/macos/` и
+  `platform/windows/` компилируются каждый на своей платформе.
 
 ## Структура проекта
 
@@ -55,8 +55,8 @@ voice-input/
 │       └── platform/
 │           ├── mod.rs       # трейты, общие типы, фабрика (ЕДИНСТВЕННОЕ место с cfg)
 │           ├── shared/      # реализации на кроссплатформенных библиотеках (cpal, плагины)
-│           ├── macos/       # реальные реализации (этап 1)
-│           └── windows/     # заглушки unimplemented!() (до этапа 2)
+│           ├── macos/       # NSPanel, CGEvent, NSWorkspace, TCC-права
+│           └── windows/     # WS_EX_NOACTIVATE, SendInput, WASAPI, реестр
 └── .github/workflows/       # ci.yml (push), release.yml (теги v*)
 ```
 
@@ -92,9 +92,8 @@ npm run check              # svelte-check + tsc
 - Общий код работает с `Arc<dyn Trait>` и типами из `platform/mod.rs`. Типы
   `objc2`/`windows`-крейтов не покидают каталог своей платформы.
 - Новая точка касания ОС = новый метод существующего трейта или новый трейт в
-  `platform/mod.rs` + заглушка в `windows/` — в том же коммите.
-- Заглушка — это `unimplemented!("windows: <что именно>")`, не тихий no-op:
-  no-op маскирует пропущенную работу на этапе 2.
+  `platform/mod.rs` + реализации в `macos/` И `windows/` — в том же коммите
+  (обе платформы живые, полумер в виде no-op не оставлять).
 
 ### Микрофонный инвариант
 
@@ -168,6 +167,33 @@ npm run check              # svelte-check + tsc
   первом обращении к микрофону.
 - Быстрая проверка микрофонного инварианта: оранжевая точка в строке меню +
   Панель управления звуком.
+
+## Dev-заметки (Windows)
+
+- Тулчейн: VS Build Tools (C++ + Windows SDK), CMake, LLVM. bindgen обоих
+  -sys-крейтов требует `LIBCLANG_PATH` (обычно `C:\Program Files\LLVM\bin`).
+- **llama-cpp-2 собирается с `dynamic-link` и здесь** (риск R-13): llama.cpp
+  уходит в DLL (llama, llama-common, ggml, ggml-base, ggml-cpu), у DLL своё
+  пространство имён символов, и статический ggml из whisper-rs в exe с ним
+  не конфликтует. llama-cpp-sys-2 сам хардлинкает DLL в `target/<profile>/`
+  и `deps/`; в инсталлер они попадают как ресурсы из `src-tauri/frameworks/`
+  (обновляет `npm run sync-dylibs` перед бандлингом).
+- Не собирать проект во временных каталогах (`%TEMP%`): MSBuild отказывает
+  (MSB8029/MSB3491); очень длинные пути тоже ломают CMake-шаги.
+- **Debug-сборка падает при загрузке модели** (0x80000003 в
+  whisper_model_load): llama-cpp-sys-2 в debug линкует отладочный CRT
+  (msvcrtd/ucrtbased), а C++-код whisper/llama собран с /MD — две кучи в
+  одном процессе. Поэтому на Windows: диктовку проверять `cargo tauri dev
+  --release`, смоук-тесты гонять с `--release`.
+- Смоук-тесты на реальных моделях (--release обязателен, см. выше):
+  `$env:VOICE_INPUT_MODEL="$env:APPDATA\com.vixarev.voiceinput\models\ggml-large-v3-turbo.bin"; cargo test --release asr_smoke -- --ignored --nocapture`
+  и аналогично `VOICE_INPUT_LLM` → `cargo test --release llm_smoke -- --ignored --nocapture`.
+- Инференс на CPU (Metal-фичи в target-секции macOS; Vulkan — кандидат на
+  будущее, потребует Vulkan SDK локально и на CI).
+- Быстрая проверка микрофонного инварианта: значок микрофона в трее;
+  программно — `LastUsedTimeStop` в
+  `HKCU\...\CapabilityAccessManager\ConsentStore\microphone\NonPackaged`
+  (0 = занят, время = освобождён).
 
 ## Критерии готовности (Definition of Done)
 
