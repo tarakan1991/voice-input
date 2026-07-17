@@ -1,0 +1,10 @@
+# Windows: Rust-код собирается под x86-64-v3 (AVX2+FMA), и llama-cpp-sys-2
+# транслирует эти фичи в GGML_AVX2/FMA/... — иначе ggml у llama падает на
+# SSE2-путь. ggml у whisper на локальных сборках определяет возможности CPU
+# сам (GGML_NATIVE=ON — его умолчание); на CI это даёт бинарь под процессор
+# раннера, поэтому релизные джобы пинят GGML_AVX2/FMA/F16C/BMI2 явно через
+# переменные окружения (см. .github/workflows, whisper-rs-sys пробрасывает
+# GGML_* в CMake). Требование к процессору: AVX2+FMA (Intel Haswell 2013+ /
+# AMD Zen) — отражено в README.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-cpu=x86-64-v3"]
