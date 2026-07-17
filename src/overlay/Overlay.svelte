@@ -10,10 +10,13 @@
   let countdown = $state<number | null>(null);
   let hotkey = $state("");
 
-  // Столбики «эквалайзера»: сглаженный уровень с лёгкой рандомизацией фаз.
+  // Столбики «эквалайзера»: автоусиление под голос говорящего (нормируем по
+  // скользящему пику, а не по абсолютной шкале — RMS речи с ноутбучного
+  // микрофона всего ~0.02–0.15) + быстрая атака и плавное затухание.
   const BARS = 14;
   let bars = $state<number[]>(new Array(BARS).fill(0.08));
   let smoothed = 0;
+  let peak = 0.02;
 
   onMount(() => {
     const unsubs: Array<() => void> = [];
@@ -30,15 +33,22 @@
     api.configGet().then((c) => (hotkey = prettyHotkey(c.hotkey)));
 
     const timer = setInterval(() => {
-      // Перцептивная шкала: тихая речь (RMS ~0.03–0.3) должна заметно
-      // двигать столбики, иначе кажется, что звук не захватывается.
-      const perceptual = Math.min(1, Math.sqrt(level * 6));
-      smoothed = smoothed * 0.6 + perceptual * 0.4;
+      // Скользящий пик: медленно затухает, мгновенно подтягивается к громким
+      // моментам. Уровень нормируем относительно него — столбики пляшут на
+      // полную при любой громкости голоса и любом усилении микрофона.
+      peak = Math.max(peak * 0.985, level, 0.015);
+      const norm = Math.min(1, level / peak);
+      const target = Math.pow(norm, 0.6);
+      // Атака быстрая, затухание плавное — как у VU-метра.
+      smoothed =
+        target > smoothed
+          ? smoothed * 0.3 + target * 0.7
+          : smoothed * 0.72 + target * 0.28;
       bars = bars.map((_: number, i: number) => {
-        const phase = Math.sin(Date.now() / 90 + i * 1.7) * 0.35 + 0.65;
-        return Math.max(0.06, Math.min(1, smoothed * phase));
+        const phase = 0.55 + 0.45 * Math.sin(Date.now() / 80 + i * 1.9);
+        return Math.max(0.08, Math.min(1, smoothed * phase));
       });
-    }, 66);
+    }, 50);
     return () => {
       clearInterval(timer);
       unsubs.forEach((u) => u());
