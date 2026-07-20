@@ -16,7 +16,11 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const release = join(root, "src-tauri", "target", "release");
+// CI выносит target в короткий каталог (CARGO_TARGET_DIR=C:\t): cl.exe не
+// умеет длинные пути, а вложенность сборщика Vulkan-шейдеров огромна.
+const targetDir =
+  process.env.CARGO_TARGET_DIR ?? join(root, "src-tauri", "target");
+const release = join(targetDir, "release");
 const frameworks = join(root, "src-tauri", "frameworks");
 mkdirSync(frameworks, { recursive: true });
 

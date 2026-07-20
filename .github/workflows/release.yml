@@ -51,6 +51,8 @@ jobs:
       # Ninja вместо MSBuild: у MSBuild гонка на первом билде генератора
       # Vulkan-шейдеров ggml — падает свежая сборка (подробнее в ci.yml).
       CMAKE_GENERATOR: Ninja
+      # Короткий target: cl.exe не умеет пути >260 символов (см. ci.yml).
+      CARGO_TARGET_DIR: C:\t
       # Релизный бинарь обязан быть воспроизводимым по набору инструкций:
       # базовый уровень AVX2+FMA (как x86-64-v3 в .cargo/config.toml),
       # а не возможности CPU конкретного раннера (GGML_NATIVE).
@@ -96,5 +98,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            src-tauri/target/release/bundle/nsis/*.exe
+            C:\t\release\bundle\nsis\*.exe
           generate_release_notes: true

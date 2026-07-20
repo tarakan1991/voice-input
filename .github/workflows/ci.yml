@@ -56,6 +56,10 @@ jobs:
       # Vulkan-шейдеров ggml (вложенный ExternalProject) — падает свежая
       # сборка; Ninja собирает с первого раза и без tlog-длинных путей.
       CMAKE_GENERATOR: Ninja
+      # Короткий target: cl.exe не умеет писать в пути >260 символов
+      # (C1083 «Cannot open compiler generated file»), а try-compile
+      # сборщика Vulkan-шейдеров вкладывается очень глубоко.
+      CARGO_TARGET_DIR: C:\t
       # Не даём ggml whisper'а печь бинарь под CPU раннера (GGML_NATIVE):
       # фиксируем базовый уровень AVX2+FMA — тот же, что x86-64-v3 в
       # .cargo/config.toml. whisper-rs-sys пробрасывает GGML_* в CMake.
