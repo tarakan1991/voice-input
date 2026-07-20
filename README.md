@@ -91,7 +91,7 @@
 
 **Windows**
 - Windows 10 или 11, только 64-бит (x64); процессор с AVX2 (Intel 2013+ / AMD Ryzen).
-- Распознавание и вычитка работают на процессоре, без GPU-ускорения — рекомендованная модель Large v3 Turbo обрабатывает фразу заметно дольше, чем на Apple Silicon (порядка минуты и более). Если важна скорость — выбирайте в мастере модель поменьше (Small/Medium); GPU-ускорение (Vulkan) в планах.
+- Видеокарта или встроенная графика с драйвером Vulkan — подойдёт любая NVIDIA, AMD или Intel не старше ~2016 года (драйвер ставится вместе с обычным видеодрайвером). Распознавание и вычитка идут на GPU: фраза обрабатывается за секунды.
 
 **Общее**
 - ~2 ГБ на диске для модели распознавания (+1–5 ГБ, если включите локальную вычитку).
@@ -114,18 +114,19 @@ CI=true cargo tauri build  # macOS: сборка .app + .dmg
 npx tauri build            # Windows: сборка NSIS-инсталлера
 ```
 
-На Windows дополнительно нужны: VS Build Tools (C++), CMake и LLVM
-(`LIBCLANG_PATH` → каталог с `libclang.dll`) — их требуют сборки
-whisper.cpp/llama.cpp и bindgen.
+На Windows дополнительно нужны: VS Build Tools (C++), CMake, LLVM
+(`LIBCLANG_PATH` → каталог с `libclang.dll`) и Vulkan SDK (`VULKAN_SDK`) —
+их требуют сборки whisper.cpp/llama.cpp, bindgen и GPU-бэкенд ggml.
+Если сборка падает с MSB3491 (путь длиннее 260 символов) — включите
+длинные пути NTFS (`LongPathsEnabled`), детали в CLAUDE.md.
 
 Документация: [SPEC.md](SPEC.md) — спецификация и архитектура (платформенные трейты — Windows-порт задуман с первого дня), [CLAUDE.md](CLAUDE.md) — рабочие правила и команды, [PROGRESS.md](PROGRESS.md) — статус и чеклист приёмки.
 
 ## Планы
 
-- [x] Windows 10/11
+- [x] Windows 10/11 (с GPU-ускорением через Vulkan: NVIDIA / AMD / Intel)
 - [ ] Push-to-talk на одиночный модификатор (правый ⌘ / Fn)
 - [ ] Автообновление
-- [ ] GPU-ускорение распознавания на Windows (Vulkan)
 
 ## Лицензия
 

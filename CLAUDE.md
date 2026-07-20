@@ -170,8 +170,16 @@ npm run check              # svelte-check + tsc
 
 ## Dev-заметки (Windows)
 
-- Тулчейн: VS Build Tools (C++ + Windows SDK), CMake, LLVM. bindgen обоих
-  -sys-крейтов требует `LIBCLANG_PATH` (обычно `C:\Program Files\LLVM\bin`).
+- Тулчейн: VS Build Tools (C++ + Windows SDK), CMake, LLVM, Vulkan SDK
+  (`VULKAN_SDK`). bindgen обоих -sys-крейтов требует `LIBCLANG_PATH`
+  (обычно `C:\Program Files\LLVM\bin`).
+- **MSB3491 (путь > 260 символов) на ggml-vulkan**: генератор шейдеров —
+  вложенный ExternalProject, и его пути поверх длинного каталога проекта
+  перелезают MAX_PATH. Лечение: собирать через короткий junction
+  (`mklink /J C:\vi <корень репо>`; фронтенд собирать из реального пути —
+  vite не любит junction) либо включить LongPathsEnabled. ВАЖНО: CMake-кэш
+  запоминает пути первой конфигурации — после смены пути снести
+  `target/*/build/{llama-cpp-sys-2,whisper-rs-sys}-*`.
 - **llama-cpp-2 собирается с `dynamic-link` и здесь** (риск R-13): llama.cpp
   уходит в DLL (llama, llama-common, ggml, ggml-base, ggml-cpu), у DLL своё
   пространство имён символов, и статический ggml из whisper-rs в exe с ним

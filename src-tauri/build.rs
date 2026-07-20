@@ -57,12 +57,22 @@ fn main() {
     // относится к исходникам приложения. Windows-ветки нет: DLL ищутся в
     // каталоге exe — ни rpath, ни плейсхолдеры не нужны (см. комментарий
     // у sync_frameworks_dir).
-    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
-        // rpath для dyld: внутри .app dylib лежат в Contents/Frameworks,
-        // у «голого» бинаря — рядом (llama-cpp-sys-2 хардлинкает их в target/).
-        println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path/../Frameworks");
-        println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path");
-        sync_frameworks_dir(LLAMA_DYLIBS);
+    match std::env::var("CARGO_CFG_TARGET_OS").as_deref() {
+        Ok("macos") => {
+            // rpath для dyld: внутри .app dylib лежат в Contents/Frameworks,
+            // у «голого» бинаря — рядом (llama-cpp-sys-2 хардлинкает их в target/).
+            println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path/../Frameworks");
+            println!("cargo:rustc-link-arg=-Wl,-rpath,@executable_path");
+            sync_frameworks_dir(LLAMA_DYLIBS);
+        }
+        Ok("windows") => {
+            // vulkan-1.dll приходит с видеодрайвером; delay-load, чтобы на
+            // машине без него приложение хотя бы стартовало (ggml-vulkan
+            // статически слинкован в exe вместе с whisper).
+            println!("cargo:rustc-link-arg=/DELAYLOAD:vulkan-1.dll");
+            println!("cargo:rustc-link-arg=delayimp.lib");
+        }
+        _ => {}
     }
     tauri_build::build();
 }

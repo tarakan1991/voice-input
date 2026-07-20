@@ -63,6 +63,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ggml-vulkan (whisper-rs/llama-cpp-2 с фичей vulkan) требует при
+      # сборке заголовки, vulkan-1.lib и компилятор шейдеров из SDK.
+      - name: Vulkan SDK
+        run: |
+          curl -Lo vulkan_sdk.exe https://sdk.lunarg.com/sdk/download/1.4.350.0/windows/vulkan_sdk.exe
+          Start-Process .\vulkan_sdk.exe -ArgumentList "--root","C:\VulkanSDK\1.4.350.0","--accept-licenses","--default-answer","--confirm-command","install" -Wait
+          "VULKAN_SDK=C:\VulkanSDK\1.4.350.0" >> $env:GITHUB_ENV
+
+      # Генератор Vulkan-шейдеров — вложенный ExternalProject, его пути
+      # перелезают MAX_PATH (MSB3491) — включаем длинные пути.
+      - name: Длинные пути NTFS
+        run: Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -Value 1 -Type DWord
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22

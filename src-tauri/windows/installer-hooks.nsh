@@ -23,6 +23,7 @@
   File "..\..\ggml.dll"
   File "..\..\ggml-base.dll"
   File "..\..\ggml-cpu.dll"
+  File "..\..\ggml-vulkan.dll"
   File "..\..\DirectML.dll"
 
   ${IfNot} ${Silent}
@@ -40,6 +41,7 @@
   Delete "$INSTDIR\ggml.dll"
   Delete "$INSTDIR\ggml-base.dll"
   Delete "$INSTDIR\ggml-cpu.dll"
+  Delete "$INSTDIR\ggml-vulkan.dll"
   Delete "$INSTDIR\DirectML.dll"
 !macroend
 
