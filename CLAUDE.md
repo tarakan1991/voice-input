@@ -203,6 +203,23 @@ npm run check              # svelte-check + tsc
   `HKCU\...\CapabilityAccessManager\ConsentStore\microphone\NonPackaged`
   (0 = занят, время = освобождён).
 
+## Автообновление
+
+- Приложения опрашивают `releases/latest/download/latest.json`; манифест
+  собирает и прикладывает к релизу джоба updater-manifest в release.yml.
+- Артефакты подписываются ключом tauri-plugin-updater: приватный ключ и
+  пароль — в GitHub Secrets (TAURI_SIGNING_PRIVATE_KEY[_PASSWORD]) и
+  локально в `~/.tauri/voiceinput-updater.key` (+ `.password.txt`).
+  **Потеря ключа = разосланные приложения перестанут обновляться** —
+  ключ обязан жить в бэкапе вне этой машины.
+- Публичный ключ зашит в tauri.conf.json (plugins.updater.pubkey).
+- Windows ставится тихо (`installMode: quiet`) — NSIS-хук с вопросом об
+  автозапуске при тихой установке не срабатывает и настройку не сбивает.
+- Тестовые рычаги: `VOICE_INPUT_UPDATE_URL` (подмена манифеста; только
+  https) и `VOICE_INPUT_UPDATE_AUTOINSTALL=1` (установка без UI) — ими
+  прогнан E2E: prerelease на GitHub с манифестом 9.9.9 → приложение само
+  скачало, проверило подпись, установило и перезапустилось.
+
 ## Критерии готовности (Definition of Done)
 
 Для любой задачи:

@@ -30,9 +30,21 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVFRUY1M0JCOUI3QUZDQzQKUldURS9IcWJ1MVB2N3BRU3hLUEtNSGk2K3hDYVk3L2NPdkI3UVZrRTZCRFUzRlNuSG5FRzhmZFcK",
+      "endpoints": [
+        "https://github.com/tarakan1991/voice-input/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "quiet"
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": ["app", "dmg"],
+    "createUpdaterArtifacts": true,
     "category": "Productivity",
     "icon": [
       "icons/32x32.png",

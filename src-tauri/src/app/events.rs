@@ -14,6 +14,8 @@ pub const DICTATION_RESULT: &str = "dictation-result";
 pub const DOWNLOAD_PROGRESS: &str = "download-progress";
 /// Навигация главного окна (из меню трея).
 pub const NAVIGATE: &str = "navigate";
+/// Прогресс скачивания обновления приложения.
+pub const UPDATE_PROGRESS: &str = "update-progress";
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SessionStatePayload {
@@ -62,4 +64,11 @@ pub struct DownloadProgressPayload {
 pub struct NavigatePayload {
     /// settings | history | wizard
     pub route: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UpdateProgressPayload {
+    pub downloaded: u64,
+    /// Полный размер, если сервер его сообщил.
+    pub total: Option<u64>,
 }

@@ -1,11 +1,14 @@
 <script lang="ts">
   // Настройки: все параметры SPEC.md §10.3. Изменения сохраняются сразу.
   import { onMount } from "svelte";
+  import { getVersion } from "@tauri-apps/api/app";
+  import { listen } from "@tauri-apps/api/event";
   import {
     api,
     type AppConfig,
     type CloudProvider,
     type ReplacementRule,
+    type UpdateInfo,
   } from "../lib/ipc";
   import ModelPicker from "../lib/ModelPicker.svelte";
   import HotkeyInput from "../lib/HotkeyInput.svelte";
@@ -17,12 +20,60 @@
   let cloudStatus = $state("");
   let termsText = $state("");
   let saveStatus = $state("");
+  let appVersion = $state("");
+  let update = $state<UpdateInfo | null>(null);
+  let updateStatus = $state("");
+  let updateBusy = $state(false);
 
-  onMount(async () => {
-    config = await api.configGet();
-    termsText = config.dictionary.terms.join("\n");
-    api.autostartStatus().then((v) => (autostart = v)).catch(() => {});
+  onMount(() => {
+    (async () => {
+      config = await api.configGet();
+      termsText = config.dictionary.terms.join("\n");
+      api.autostartStatus().then((v) => (autostart = v)).catch(() => {});
+      appVersion = await getVersion();
+    })();
+    // Прогресс скачивания обновления.
+    const un = listen<{ downloaded: number; total: number | null }>(
+      "update-progress",
+      (e) => {
+        const mb = (e.payload.downloaded / 1048576).toFixed(0);
+        const total = e.payload.total
+          ? ` из ${(e.payload.total / 1048576).toFixed(0)}`
+          : "";
+        updateStatus = `Скачиваю: ${mb}${total} МБ…`;
+      },
+    );
+    return () => {
+      un.then((f) => f());
+    };
   });
+
+  async function checkUpdate() {
+    updateBusy = true;
+    updateStatus = "проверяю…";
+    try {
+      update = await api.updateCheck();
+      updateStatus = update ? "" : "У вас последняя версия";
+      setTimeout(() => (updateStatus = ""), 3000);
+    } catch (e) {
+      updateStatus = `Ошибка: ${e}`;
+    } finally {
+      updateBusy = false;
+    }
+  }
+
+  async function installUpdate() {
+    updateBusy = true;
+    updateStatus = "скачиваю…";
+    try {
+      // На Windows установщик перезапустит приложение сам, на macOS
+      // перезапуск делает бекенд — сюда мы обычно уже не вернёмся.
+      await api.updateInstall();
+    } catch (e) {
+      updateStatus = `Ошибка: ${e}`;
+      updateBusy = false;
+    }
+  }
 
   async function save() {
     if (!config) return;
@@ -365,6 +416,21 @@
           onchange={save}
         />
       </label>
+      <div class="row">
+        <span>Версия {appVersion}</span>
+        {#if update}
+          <button
+            onclick={installUpdate}
+            disabled={updateBusy}
+          >
+            {updateStatus || `Обновить до ${update.version}`}
+          </button>
+        {:else}
+          <button onclick={checkUpdate} disabled={updateBusy}>
+            {updateStatus || "Проверить обновления"}
+          </button>
+        {/if}
+      </div>
     </section>
   </div>
 {/if}

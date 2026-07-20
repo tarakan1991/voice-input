@@ -25,7 +25,9 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .plugin(tauri_plugin_notification::init());
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(commands::PendingUpdate::default());
     builder = crate::platform::register_plugins(builder);
 
     builder
@@ -70,6 +72,8 @@ pub fn run() {
             commands::pause_set,
             commands::wizard_complete,
             commands::main_window_hide,
+            commands::update_check,
+            commands::update_install,
         ])
         .run(tauri::generate_context!())
         .expect("ошибка запуска приложения");
@@ -126,6 +130,9 @@ fn setup(app: &AppHandle) -> Result<()> {
     // Выгрузка моделей по простою.
     spawn_idle_unloader(app.clone());
 
+    // Автопроверка обновлений — не мешая запуску.
+    spawn_update_check(app.clone());
+
     // Первый запуск — мастер.
     if !config.get().wizard_completed {
         if let Some(win) = app.get_webview_window("main") {
@@ -174,6 +181,51 @@ pub fn set_paused(app: &AppHandle, paused: bool) -> Result<()> {
         tray::set_state(app, tray::TrayState::Idle);
     }
     Ok(())
+}
+
+/// Через полминуты после старта тихо проверяет обновления; если есть —
+/// системное уведомление и готовое к установке обновление в состоянии
+/// (настройки покажут кнопку «Установить»). Ошибки сети не шумят.
+fn spawn_update_check(app: AppHandle) {
+    std::thread::Builder::new()
+        .name("update-check".into())
+        .spawn(move || {
+            std::thread::sleep(Duration::from_secs(30));
+            let result = tauri::async_runtime::block_on(async {
+                commands::build_updater(&app)?
+                    .check()
+                    .await
+                    .map_err(|e| e.to_string())
+            });
+            match result {
+                Ok(Some(update)) => {
+                    log::info!("доступно обновление {}", update.version);
+                    // Тестовый рычаг E2E: ставим сразу, без участия UI.
+                    if std::env::var_os("VOICE_INPUT_UPDATE_AUTOINSTALL").is_some() {
+                        log::warn!("VOICE_INPUT_UPDATE_AUTOINSTALL задан — ставлю обновление");
+                        let install = tauri::async_runtime::block_on(
+                            update.download_and_install(|_, _| {}, || {}),
+                        );
+                        match install {
+                            Ok(()) => app.restart(),
+                            Err(e) => log::error!("автоустановка обновления: {e}"),
+                        }
+                        return;
+                    }
+                    use tauri_plugin_notification::NotificationExt;
+                    let _ = app
+                        .notification()
+                        .builder()
+                        .title(format!("VoiceInput {} доступна", update.version))
+                        .body("Установить обновление можно в настройках.")
+                        .show();
+                    *app.state::<commands::PendingUpdate>().0.lock() = Some(update);
+                }
+                Ok(None) => log::debug!("обновлений нет"),
+                Err(e) => log::info!("проверка обновлений не удалась: {e}"),
+            }
+        })
+        .ok();
 }
 
 fn spawn_idle_unloader(app: AppHandle) {

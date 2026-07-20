@@ -26,6 +26,74 @@ pub fn config_get(state: State<AppState>) -> AppConfig {
     state.config.get()
 }
 
+// ---------------------------------------------------------------------------
+// Автообновление
+// ---------------------------------------------------------------------------
+
+/// Найденное, но ещё не установленное обновление — между check и install.
+#[derive(Default)]
+pub struct PendingUpdate(pub parking_lot::Mutex<Option<tauri_plugin_updater::Update>>);
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UpdateInfo {
+    pub version: String,
+    pub notes: Option<String>,
+}
+
+/// Собирает updater с учётом тестового рычага VOICE_INPUT_UPDATE_URL
+/// (подменяет endpoint — так обновление проверяется без публикации релиза).
+pub(crate) fn build_updater(app: &AppHandle) -> Result<tauri_plugin_updater::Updater, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let mut builder = app.updater_builder();
+    if let Ok(url) = std::env::var("VOICE_INPUT_UPDATE_URL") {
+        log::warn!("VOICE_INPUT_UPDATE_URL задан — проверяю обновления по {url}");
+        let parsed = url.parse().map_err(err_str)?;
+        builder = builder.endpoints(vec![parsed]).map_err(err_str)?;
+    }
+    builder.build().map_err(err_str)
+}
+
+#[tauri::command]
+pub async fn update_check(app: AppHandle) -> CmdResult<Option<UpdateInfo>> {
+    let updater = build_updater(&app)?;
+    let update = updater.check().await.map_err(err_str)?;
+    let info = update.as_ref().map(|u| UpdateInfo {
+        version: u.version.clone(),
+        notes: u.body.clone(),
+    });
+    *app.state::<PendingUpdate>().0.lock() = update;
+    Ok(info)
+}
+
+/// Скачивает и устанавливает найденное обновление. Прогресс — событием
+/// `update-progress`. На Windows инсталлер перезапускает установку сам
+/// (приложение выходит), на macOS перезапускаемся явно.
+#[tauri::command]
+pub async fn update_install(app: AppHandle) -> CmdResult<()> {
+    let update = app
+        .state::<PendingUpdate>()
+        .0
+        .lock()
+        .take()
+        .ok_or_else(|| "сначала проверьте наличие обновления".to_string())?;
+    let progress_app = app.clone();
+    let mut downloaded: u64 = 0;
+    update
+        .download_and_install(
+            move |chunk, total| {
+                downloaded += chunk as u64;
+                let _ = progress_app.emit(
+                    events::UPDATE_PROGRESS,
+                    events::UpdateProgressPayload { downloaded, total },
+                );
+            },
+            || {},
+        )
+        .await
+        .map_err(err_str)?;
+    app.restart();
+}
+
 #[tauri::command]
 pub fn config_set(app: AppHandle, state: State<AppState>, config: AppConfig) -> CmdResult<()> {
     let old = state.config.get();

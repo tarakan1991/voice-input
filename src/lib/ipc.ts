@@ -187,7 +187,15 @@ export const api = {
   pauseSet: (paused: boolean) => invoke<void>("pause_set", { paused }),
   wizardComplete: () => invoke<void>("wizard_complete"),
   mainWindowHide: () => invoke<void>("main_window_hide"),
+
+  updateCheck: () => invoke<UpdateInfo | null>("update_check"),
+  updateInstall: () => invoke<void>("update_install"),
 };
+
+export interface UpdateInfo {
+  version: string;
+  notes: string | null;
+}
 
 // ---------------------------------------------------------------------------
 // События

@@ -15,6 +15,10 @@ jobs:
   macos:
     name: macOS (Apple Silicon)
     runs-on: macos-14
+    env:
+      # Подпись артефактов автообновления (tauri-plugin-updater).
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -40,6 +44,8 @@ jobs:
         with:
           files: |
             src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
           generate_release_notes: true
 
   windows:
@@ -53,6 +59,9 @@ jobs:
       CMAKE_GENERATOR: Ninja
       # Короткий target: cl.exe не умеет пути >260 символов (см. ci.yml).
       CARGO_TARGET_DIR: C:\t
+      # Подпись артефактов автообновления (tauri-plugin-updater).
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       # Релизный бинарь обязан быть воспроизводимым по набору инструкций:
       # базовый уровень AVX2+FMA (как x86-64-v3 в .cargo/config.toml),
       # а не возможности CPU конкретного раннера (GGML_NATIVE).
@@ -99,4 +108,46 @@ jobs:
         with:
           files: |
             C:\t\release\bundle\nsis\*.exe
+            C:\t\release\bundle\nsis\*.exe.sig
           generate_release_notes: true
+
+  # Манифест автообновления: приложения опрашивают
+  # releases/latest/download/latest.json (см. plugins.updater в tauri.conf).
+  updater-manifest:
+    name: Манифест автообновления (latest.json)
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Сборка и загрузка latest.json
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          REPO="${GITHUB_REPOSITORY}"
+          BASE="https://github.com/${REPO}/releases/download/${TAG}"
+
+          gh release download "$TAG" --repo "$REPO" --pattern "*.sig" --dir sigs
+          ls -la sigs
+
+          MAC_TGZ=$(gh release view "$TAG" --repo "$REPO" --json assets -q '.assets[].name' | grep '\.app\.tar\.gz$')
+          WIN_EXE=$(gh release view "$TAG" --repo "$REPO" --json assets -q '.assets[].name' | grep -- '-setup\.exe$')
+
+          jq -n \
+            --arg version "$VERSION" \
+            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg mac_sig "$(cat "sigs/${MAC_TGZ}.sig")" \
+            --arg mac_url "${BASE}/${MAC_TGZ}" \
+            --arg win_sig "$(cat "sigs/${WIN_EXE}.sig")" \
+            --arg win_url "${BASE}/${WIN_EXE}" \
+            '{
+              version: $version,
+              pub_date: $pub_date,
+              platforms: {
+                "darwin-aarch64": { signature: $mac_sig, url: $mac_url },
+                "windows-x86_64": { signature: $win_sig, url: $win_url }
+              }
+            }' > latest.json
+          cat latest.json
+          gh release upload "$TAG" latest.json --repo "$REPO" --clobber
