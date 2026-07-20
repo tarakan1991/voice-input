@@ -12,13 +12,22 @@
   let devices = $state<AudioDevice[]>([]);
   let builtin = $state<AudioDevice | null>(null);
 
-  onMount(async () => {
+  async function load() {
     try {
       devices = await api.devicesList();
       builtin = await api.builtinDevice();
     } catch (e) {
       console.error("устройства не перечислились", e);
     }
+  }
+
+  // Окно настроек при закрытии прячется и живёт дальше — onMount срабатывает
+  // один раз. Устройства, подключённые позже (Bluetooth-гарнитура), должны
+  // появляться в списке: перечитываем при каждом возврате фокуса в окно.
+  onMount(() => {
+    load();
+    window.addEventListener("focus", load);
+    return () => window.removeEventListener("focus", load);
   });
 
   function set(v: MicSelection) {
