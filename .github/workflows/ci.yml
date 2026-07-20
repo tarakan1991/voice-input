@@ -52,6 +52,10 @@ jobs:
     env:
       # bindgen (whisper-rs-sys, llama-cpp-sys-2) требует libclang.
       LIBCLANG_PATH: C:\Program Files\LLVM\bin
+      # Ninja вместо MSBuild: у MSBuild гонка на первом билде генератора
+      # Vulkan-шейдеров ggml (вложенный ExternalProject) — падает свежая
+      # сборка; Ninja собирает с первого раза и без tlog-длинных путей.
+      CMAKE_GENERATOR: Ninja
       # Не даём ggml whisper'а печь бинарь под CPU раннера (GGML_NATIVE):
       # фиксируем базовый уровень AVX2+FMA — тот же, что x86-64-v3 в
       # .cargo/config.toml. whisper-rs-sys пробрасывает GGML_* в CMake.
