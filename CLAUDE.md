@@ -158,8 +158,17 @@ npm run check              # svelte-check + tsc
   `APPLE_SIGNING_IDENTITY="VoiceInput Dev Signing" CI=true cargo tauri build`
   (или переподписать готовый бандл:
   `codesign --force --deep -s "VoiceInput Dev Signing" /Applications/VoiceInput.app`).
-  В tauri.conf.json identity сознательно НЕ прописан — на CI-раннере этого
-  сертификата нет, релизные артефакты CI остаются ad-hoc.
+  В tauri.conf.json прописан `signingIdentity: "-"` (ad-hoc): на CI-раннере
+  сертификата нет, а **без подписи бандла TCC отказывается доверять
+  приложению вообще** — линкерная ad-hoc подпись бинаря заявляет ресурсы,
+  которых у неподписанного бандла нет, `codesign --verify` падает на «code
+  has no resources», и Accessibility нельзя выдать никаким способом: тумблер
+  включается, `AXIsProcessTrusted()` навсегда false. `APPLE_SIGNING_IDENTITY`
+  перекрывает конфиг, поэтому локальные сборки по-прежнему подписываются
+  «VoiceInput Dev Signing». У релизов CI подпись валидная, но ad-hoc: cdhash
+  меняется от сборки к сборке, и после каждого обновления право приходится
+  выдавать заново (приложение предупреждает об этом на старте). Снимет это
+  только Developer ID.
   Если права всё же зависли (например, после установки ad-hoc сборки):
   `tccutil reset Accessibility com.vixarev.voiceinput && tccutil reset
   Microphone com.vixarev.voiceinput` и выдать заново.
