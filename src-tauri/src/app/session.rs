@@ -440,6 +440,13 @@ fn process_and_inject(
             show_on_overlay(deps, "notice", message, 3);
             "left_in_clipboard"
         }
+        InjectionOutcome::NoInputPermission => {
+            let message = "Нет права «Универсальный доступ» — текст в буфере обмена. \
+                 Выдайте право в настройках, macOS сбрасывает его при обновлении";
+            notify(app, message);
+            show_on_overlay(deps, "notice", message, 5);
+            "no_input_permission"
+        }
     };
 
     if config.history_enabled {

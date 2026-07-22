@@ -16,7 +16,7 @@ use anyhow::{Context, Result};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
-use tauri::{AppHandle, Manager, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 
 pub fn run() {
     let mut builder = tauri::Builder::default()
@@ -139,8 +139,39 @@ fn setup(app: &AppHandle) -> Result<()> {
             let _ = win.show();
             let _ = win.set_focus();
         }
+    } else {
+        warn_if_input_permission_lost(app, &services);
     }
     Ok(())
+}
+
+/// macOS привязывает право на управление вводом к подписи бинаря, поэтому
+/// каждое обновление его сбрасывает: галка в системных настройках остаётся,
+/// а приложение права не имеет — диктовка работает, вставка молча нет.
+/// Ловим это на старте и объясняем, вместо того чтобы ждать жалобы.
+fn warn_if_input_permission_lost(app: &AppHandle, services: &crate::platform::PlatformServices) {
+    if crate::inject::input_permission_ok(services) {
+        return;
+    }
+    log::warn!("accessibility permission missing on startup");
+    use tauri_plugin_notification::NotificationExt;
+    let _ = app
+        .notification()
+        .builder()
+        .title("VoiceInput: нет права на вставку текста")
+        .body(
+            "Выдайте «Универсальный доступ» — иначе распознанный текст \
+             останется в буфере обмена. macOS сбрасывает это право при обновлении.",
+        )
+        .show();
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.show();
+        let _ = win.set_focus();
+        let _ = app.emit(
+            events::NAVIGATE,
+            events::NavigatePayload { route: "settings" },
+        );
+    }
 }
 
 /// Регистрирует главный хоткей на текущую комбинацию и режим из конфига.

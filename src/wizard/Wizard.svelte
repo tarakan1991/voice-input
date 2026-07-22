@@ -13,6 +13,7 @@
   import ModelPicker from "../lib/ModelPicker.svelte";
   import HotkeyInput from "../lib/HotkeyInput.svelte";
   import MicPicker from "../lib/MicPicker.svelte";
+  import PermissionList from "../lib/PermissionList.svelte";
 
   let { ondone }: { ondone: () => void } = $props();
 
@@ -30,9 +31,8 @@
   let step = $state(0);
   let config = $state<AppConfig | null>(null);
 
-  // Шаг 1: разрешения
+  // Шаг 1: разрешения (список и опрос статусов — в PermissionList)
   let permissions = $state<PermissionInfo[]>([]);
-  let permTimer: ReturnType<typeof setInterval> | undefined;
 
   // Шаг 3: вычитка
   let cloudKey = $state("");
@@ -48,10 +48,6 @@
   onMount(() => {
     api.configGet().then((c) => (config = c));
     api.autostartStatus().then((v) => (autostart = v)).catch(() => {});
-    refreshPermissions();
-    permTimer = setInterval(() => {
-      if (step === 0) refreshPermissions();
-    }, 1500);
     let unsub: (() => void) | undefined;
     events
       .onDictationResult((r) => {
@@ -59,19 +55,8 @@
         testRunning = false;
       })
       .then((u) => (unsub = u));
-    return () => {
-      clearInterval(permTimer);
-      unsub?.();
-    };
+    return () => unsub?.();
   });
-
-  async function refreshPermissions() {
-    try {
-      permissions = await api.permissionsList();
-    } catch (e) {
-      console.error(e);
-    }
-  }
 
   const permissionsOk = $derived(
     permissions.length > 0 &&
@@ -79,17 +64,6 @@
         (p) => p.status === "granted" || p.status === "not_applicable",
       ),
   );
-
-  const permName: Record<string, string> = {
-    microphone: "Микрофон",
-    accessibility: "Универсальный доступ (Accessibility)",
-    input_monitoring: "Мониторинг ввода",
-  };
-  const permHint: Record<string, string> = {
-    microphone: "Нужен для записи речи — только на время диктовки.",
-    accessibility: "Нужен, чтобы вставлять текст в активное поле (Cmd+V).",
-    input_monitoring: "В этой версии не требуется.",
-  };
 
   async function save() {
     if (config) await api.configSet($state.snapshot(config));
@@ -168,36 +142,7 @@
         <p class="muted">
           Статус проверяется автоматически — выдайте право и вернитесь сюда.
         </p>
-        {#each permissions as p (p.permission)}
-          <div class="perm">
-            <span class="perm-status" data-status={p.status}>
-              {p.status === "granted"
-                ? "✓"
-                : p.status === "not_applicable"
-                  ? "—"
-                  : "✕"}
-            </span>
-            <div class="grow">
-              <strong>{permName[p.permission]}</strong>
-              <p class="muted">{permHint[p.permission]}</p>
-            </div>
-            {#if p.status !== "granted" && p.status !== "not_applicable"}
-              {#if p.status === "not_determined"}
-                <button
-                  class="primary"
-                  onclick={() => api.permissionRequest(p.permission)}
-                >
-                  Запросить
-                </button>
-              {/if}
-              <button
-                onclick={() => api.permissionOpenSettings(p.permission)}
-              >
-                Открыть настройки
-              </button>
-            {/if}
-          </div>
-        {/each}
+        <PermissionList onchange={(p) => (permissions = p)} />
       {:else if step === 1}
         <h2>Модель распознавания речи</h2>
         <p class="muted">
@@ -454,29 +399,6 @@
     color: var(--muted);
     font-size: 13px;
     margin: 2px 0;
-  }
-  .perm {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 10px 14px;
-  }
-  .perm-status {
-    font-size: 18px;
-    width: 24px;
-    text-align: center;
-  }
-  .perm-status[data-status="granted"] {
-    color: var(--ok);
-  }
-  .perm-status[data-status="denied"],
-  .perm-status[data-status="not_determined"] {
-    color: var(--danger);
-  }
-  .grow {
-    flex: 1;
   }
   .option {
     display: flex;

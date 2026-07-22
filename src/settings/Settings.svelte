@@ -13,6 +13,7 @@
   import ModelPicker from "../lib/ModelPicker.svelte";
   import HotkeyInput from "../lib/HotkeyInput.svelte";
   import MicPicker from "../lib/MicPicker.svelte";
+  import PermissionList from "../lib/PermissionList.svelte";
 
   let config = $state<AppConfig | null>(null);
   let autostart = $state(false);
@@ -133,6 +134,16 @@
 {#if config}
   <div class="settings">
     <div class="savebar">{saveStatus}</div>
+
+    <section>
+      <h2>Разрешения</h2>
+      <p class="muted">
+        macOS привязывает права к подписи приложения — после обновления их
+        иногда приходится выдавать заново. Без «Универсального доступа»
+        распознанный текст останется в буфере обмена вместо активного поля.
+      </p>
+      <PermissionList />
+    </section>
 
     <section>
       <h2>Хоткей</h2>

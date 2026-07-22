@@ -24,6 +24,7 @@
   const statusText: Record<string, string> = {
     injected: "вставлено",
     left_in_clipboard: "в буфере обмена",
+    no_input_permission: "в буфере обмена — нет прав",
     cancelled: "отменено",
     error: "ошибка",
   };

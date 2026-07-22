@@ -22,6 +22,9 @@ pub enum InjectionOutcome {
     /// Активно поле защищённого ввода (пароль) — вставка невозможна,
     /// текст оставлен в буфере обмена.
     BlockedSecureInput,
+    /// Нет права на управление вводом (Accessibility) — эмуляция Cmd+V
+    /// ничего не сделает, текст оставлен в буфере обмена.
+    NoInputPermission,
 }
 
 /// Снимок буфера обмена перед вставкой.
@@ -56,6 +59,16 @@ fn restore_clipboard(clipboard: &mut Clipboard, backup: ClipboardBackup) {
     }
 }
 
+/// Есть ли право, без которого эмуляция клавиш не работает. Там, где такого
+/// права не существует (Windows), проверка всегда положительна.
+pub fn input_permission_ok(services: &PlatformServices) -> bool {
+    use crate::platform::{Permission, PermissionStatus};
+    matches!(
+        services.permissions.status(Permission::Accessibility),
+        PermissionStatus::Granted | PermissionStatus::NotApplicable
+    )
+}
+
 /// Вставляет текст в приложение из снимка фокуса.
 pub fn inject(
     services: &PlatformServices,
@@ -81,6 +94,16 @@ pub fn inject(
         let mut clipboard = Clipboard::new().context("буфер обмена недоступен")?;
         clipboard.set_text(text.to_string()).ok();
         return Ok(InjectionOutcome::BlockedSecureInput);
+    }
+
+    // Без права на управление вводом система молча проглатывает Cmd+V:
+    // вставки нет, ошибки нет, а буфер мы бы восстановили — текст исчез бы
+    // бесследно (инвариант SPEC.md §2: текст не теряется молча). Право
+    // слетает при каждом обновлении: macOS привязывает его к подписи бинаря.
+    if !input_permission_ok(services) {
+        let mut clipboard = Clipboard::new().context("буфер обмена недоступен")?;
+        clipboard.set_text(text.to_string()).ok();
+        return Ok(InjectionOutcome::NoInputPermission);
     }
 
     match config.injection_mode {
