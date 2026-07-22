@@ -69,6 +69,32 @@
     btn?.focus();
   }
 
+  // Комбинацию, перехваченную системой или другой программой (например,
+  // ⌃⌥Space в macOS — переключение раскладки), окно не увидит вовсе: keydown
+  // до нас не доходит, и поле молчит. Молчание объясняем подсказкой.
+  // Модификаторы приходят всегда — по ним таймер перезапускаем.
+  let hintTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function armHint() {
+    clearHint();
+    hintTimer = setTimeout(() => {
+      if (!capturing) return;
+      status = "invalid";
+      message =
+        "Нажатий не видно — комбинацию перехватывает система или другая " +
+        "программа. Например, ⌃⌥Space в macOS переключает раскладку " +
+        "(Системные настройки → Клавиатура → Сочетания клавиш). " +
+        "Освободите её там или выберите другую.";
+    }, 3000);
+  }
+
+  function clearHint() {
+    if (hintTimer) {
+      clearTimeout(hintTimer);
+      hintTimer = null;
+    }
+  }
+
   async function onKeydown(e: KeyboardEvent) {
     if (!capturing) return;
     e.preventDefault();
@@ -77,7 +103,11 @@
       capturing = false;
       return;
     }
-    if (MODIFIER_CODES.has(e.code)) return;
+    if (MODIFIER_CODES.has(e.code)) {
+      armHint();
+      return;
+    }
+    clearHint();
     const combo = comboFromEvent(e);
     if (!combo) {
       status = "invalid";
@@ -110,7 +140,9 @@
     };
     window.addEventListener("keydown", onKey, true);
     window.addEventListener("mousedown", onPointerDown, true);
+    armHint();
     return () => {
+      clearHint();
       window.removeEventListener("keydown", onKey, true);
       window.removeEventListener("mousedown", onPointerDown, true);
     };
