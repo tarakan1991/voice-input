@@ -1,6 +1,6 @@
 ﻿[package]
 name = "voice-input"
-version = "0.2.3"
+version = "0.2.4"
 description = "Голосовой ввод текста: локальное распознавание (whisper.cpp) и вычитка"
 edition = "2021"
 rust-version = "1.82"
